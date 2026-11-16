@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
+import Editor from '@monaco-editor/react'
 
 function App() {
   const [domanda, setDomanda] = useState('')
@@ -37,11 +38,19 @@ function App() {
   }
 
   const esercizio = esercizi[0] // Prendiamo il primo esercizio come esempio
-
+  const [codice, setCodice] = useState(esercizio.codiceIniziale)
   return (
     <>
       <h2>{esercizio.titolo}</h2>
+      <p>Categoria: {esercizio.categoria}</p>
+      <p>Difficoltà: {esercizio.difficolta}</p>
       <p>{esercizio.testo}</p>
+      <Editor
+        height="300px"
+        defaultLanguage="javascript"
+        value={codice}
+        onChange={(nuovo) => setCodice(nuovo ?? '')}
+      />
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
       <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
       <button onClick={invia} disabled={loading}>
