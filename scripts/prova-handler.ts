@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import handler from './api/ai.ts';
+import handler from '../api/ai.ts';
 
 function makeRes() {
   const res: any = {
