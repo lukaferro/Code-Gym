@@ -15,14 +15,43 @@ function makeRes() {
   return res;
 }
 
-console.log('--- POST valido ---');
+const messages = [{ role: 'user', content: 'Dimmi ciao in inglese' }];
+
+console.log('--- password giusta (deve dare 200) ---');
 await handler(
-  { method: 'POST', body: { messages: [{ role: 'user', content: 'Dimmi ciao in inglese' }] } } as any,
+  {
+    method: 'POST',
+    headers: { 'x-app-password': process.env.APP_PASSWORD },
+    body: { messages },
+  } as any,
+  makeRes()
+);
+
+console.log('--- password sbagliata (deve dare 401) ---');
+await handler(
+  {
+    method: 'POST',
+    headers: { 'x-app-password': 'sbagliata' },
+    body: { messages },
+  } as any,
+  makeRes()
+);
+
+console.log('--- senza password (deve dare 401) ---');
+await handler(
+  { method: 'POST', headers: {}, body: { messages } } as any,
   makeRes()
 );
 
 console.log('--- GET (deve dare 405) ---');
-await handler({ method: 'GET' } as any, makeRes());
+await handler({ method: 'GET', headers: {} } as any, makeRes());
 
-console.log('--- messaggi vuoti (deve dare 400) ---');
-await handler({ method: 'POST', body: { messages: [] } } as any, makeRes());
+console.log('--- messaggi vuoti con password giusta (deve dare 400) ---');
+await handler(
+  {
+    method: 'POST',
+    headers: { 'x-app-password': process.env.APP_PASSWORD },
+    body: { messages: [] },
+  } as any,
+  makeRes()
+);

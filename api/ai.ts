@@ -74,6 +74,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Metodo non consentito' });
     }
 
+    const password = req.headers['x-app-password'];
+    if (password !== process.env.APP_PASSWORD) {
+        return res.status(401).json({ error: 'Non autorizzato' });
+    }
+
     const messages = req.body?.messages;
     if (!Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ error: 'Servono dei messaggi' });
