@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import { esercizi } from './esercizi'
 
 function App() {
   const [domanda, setDomanda] = useState('')
@@ -35,8 +36,12 @@ function App() {
     }
   }
 
+  const esercizio = esercizi[0] // Prendiamo il primo esercizio come esempio
+
   return (
     <>
+      <h2>{esercizio.titolo}</h2>
+      <p>{esercizio.testo}</p>
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
       <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
       <button onClick={invia} disabled={loading}>
