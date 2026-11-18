@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
+import { eseguiTest } from './runner'
+import type { RisultatoTest } from './runner'
 import Editor from '@monaco-editor/react'
 
 function App() {
@@ -39,6 +41,14 @@ function App() {
 
   const esercizio = esercizi[0] // Prendiamo il primo esercizio come esempio
   const [codice, setCodice] = useState(esercizio.codiceIniziale)
+  const [risultati, setRisultati] = useState<RisultatoTest[]>([])
+
+  function esegui(): void {
+    setRisultati(eseguiTest(codice, esercizio))
+  }
+
+  const superati = risultati.filter((risultato) => risultato.corretto).length
+
   return (
     <>
       <h2>{esercizio.titolo}</h2>
@@ -51,6 +61,24 @@ function App() {
         value={codice}
         onChange={(nuovo) => setCodice(nuovo ?? '')}
       />
+      <button onClick={esegui}>Esegui test</button>
+      {risultati.length > 0 && (
+        <div>
+          <p>
+            {superati} su {risultati.length} superati
+          </p>
+          <ul>
+            {risultati.map((risultato, indice) => (
+              <li key={indice}>
+                {risultato.corretto ? 'OK' : 'NO'} - input: {JSON.stringify(risultato.input)} -
+                atteso: {JSON.stringify(risultato.atteso)} - ottenuto:{' '}
+                {JSON.stringify(risultato.ottenuto) ?? 'niente'}
+                {risultato.errore && <span> - errore: {risultato.errore}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
       <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
       <button onClick={invia} disabled={loading}>
