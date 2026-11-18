@@ -55,3 +55,9 @@ await handler(
   } as any,
   makeRes()
 );
+
+console.log('--- APP_PASSWORD non impostata (deve dare 401, non 200) ---');
+const passwordSalvata = process.env.APP_PASSWORD;
+delete process.env.APP_PASSWORD;
+await handler({ method: 'POST', headers: {}, body: { messages } } as any, makeRes());
+process.env.APP_PASSWORD = passwordSalvata;

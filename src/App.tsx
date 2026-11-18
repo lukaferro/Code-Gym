@@ -25,8 +25,8 @@ function App() {
         }),
       })
       if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Errore: ${res.status} - ${detail}`)
+        const dettaglio: { error?: string } = await res.json()
+        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
       }
       const data = await res.json()
       setRisposta(data.text)

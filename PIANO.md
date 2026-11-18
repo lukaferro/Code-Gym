@@ -36,7 +36,7 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 | Esercizi (dati) | `src/esercizi.ts` |
 | Runner dei test | `src/runner.ts` |
 | API con fallback tra provider | `api/ai.ts` |
-| Script di prova locali | `prova.mjs`, `prova-handler.ts`, `prova-online.mjs` |
+| Script di prova locali | `scripts/prova.mjs`, `scripts/prova-handler.ts`, `scripts/prova-online.mjs` |
 
 API: `POST /api/ai`, header `x-app-password`, body `{ "messages": [{ "role": "user", "content": "..." }] }`, risposta `{ "provider": "...", "text": "..." }`.
 
