@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
-import { eseguiTest } from './runner'
+import { risultatiTempoScaduto } from './runner'
 import type { RisultatoTest } from './runner'
 import Editor from '@monaco-editor/react'
+
+const LIMITE_MS = 3000
 
 function App() {
   const [domanda, setDomanda] = useState('')
@@ -42,9 +44,46 @@ function App() {
   const esercizio = esercizi[0] // Prendiamo il primo esercizio come esempio
   const [codice, setCodice] = useState(esercizio.codiceIniziale)
   const [risultati, setRisultati] = useState<RisultatoTest[]>([])
+  const [inCorso, setInCorso] = useState(false)
 
   function esegui(): void {
-    setRisultati(eseguiTest(codice, esercizio))
+    setInCorso(true)
+
+    const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+
+    // Se il worker non risponde entro il limite, lo terminiamo noi.
+    const timer = setTimeout(() => {
+      worker.terminate()
+      setRisultati(risultatiTempoScaduto(esercizio))
+      setInCorso(false)
+    }, LIMITE_MS)
+
+    // funzione unica per chiudere tutto senza dimenticare il timer
+    function chiudi(): void {
+      clearTimeout(timer)
+      worker.terminate()
+      setInCorso(false)
+    }
+
+    worker.onmessage = (evento: MessageEvent<RisultatoTest[]>) => {
+      setRisultati(evento.data)
+      chiudi()
+    }
+
+    worker.onerror = (evento: ErrorEvent) => {
+      setRisultati([
+        {
+          input: [],
+          atteso: undefined,
+          ottenuto: undefined,
+          corretto: false,
+          errore: evento.message || 'Errore nel worker',
+        },
+      ])
+      chiudi()
+    }
+
+    worker.postMessage({ codice, esercizio })
   }
 
   const superati = risultati.filter((risultato) => risultato.corretto).length
@@ -61,7 +100,9 @@ function App() {
         value={codice}
         onChange={(nuovo) => setCodice(nuovo ?? '')}
       />
-      <button onClick={esegui}>Esegui test</button>
+      <button onClick={esegui} disabled={inCorso}>
+        {inCorso ? 'In esecuzione...' : 'Esegui test'}
+      </button>
       {risultati.length > 0 && (
         <div>
           <p>

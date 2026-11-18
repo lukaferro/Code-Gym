@@ -8,6 +8,23 @@ export type RisultatoTest = {
     errore?: string;
 }
 
+// Cosa il worker riceve: il codice scritto dall'utente e l'esercizio da verificare.
+export type RichiestaTest = {
+    codice: string;
+    esercizio: Esercizio;
+}
+
+// Risultati finti usati quando il worker viene terminato per tempo scaduto.
+export function risultatiTempoScaduto(esercizio: Esercizio): RisultatoTest[] {
+    return esercizio.test.map(test => ({
+        input: test.input,
+        atteso: test.atteso,
+        ottenuto: undefined,
+        corretto: false,
+        errore: 'Tempo scaduto: possibile ciclo infinito',
+    }));
+}
+
 export function eseguiTest(codice: string, esercizio: Esercizio): RisultatoTest[] {
 
     const risultati: RisultatoTest[] = [];
