@@ -48,7 +48,8 @@ Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OP
 - [x] Fase 1 (parziale): tipo `Esercizio` e primo esercizio, editor Monaco, `runner.ts` con test
 - [x] Bottone "Esegui test" e risultati mostrati nella pagina
 - [x] Web Worker con limite di tempo (ciclo infinito)
-- [ ] Altri esercizi (almeno 20)
+- [x] Selettore dell'esercizio nella pagina
+- [x] Altri esercizi (almeno 20)
 - [ ] Salvataggio dei tentativi (modulo `db.ts`)
 - [ ] Password ricordata dal browser (`localStorage`)
 

@@ -3,16 +3,34 @@ import './App.css'
 import { esercizi } from './esercizi'
 import { risultatiTempoScaduto } from './runner'
 import type { RisultatoTest } from './runner'
+import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
 
 const LIMITE_MS = 3000
 
 function App() {
+  const scuro = useTemaScuro()
+
+  // stato del tutor IA
   const [domanda, setDomanda] = useState('')
   const [risposta, setRisposta] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // stato dell'esercizio
+  const [indice, setIndice] = useState(0)
+  const esercizio = esercizi[indice]
+  const [codice, setCodice] = useState(esercizio.codiceIniziale)
+  const [risultati, setRisultati] = useState<RisultatoTest[]>([])
+  const [inCorso, setInCorso] = useState(false)
+
+  function cambiaEsercizio(nuovoIndice: number): void {
+    setIndice(nuovoIndice)
+    // l'editor non si svuota da solo: rimettiamo il codice iniziale del nuovo esercizio
+    setCodice(esercizi[nuovoIndice].codiceIniziale)
+    setRisultati([])
+  }
 
   async function invia() {
     setLoading(true)
@@ -40,11 +58,6 @@ function App() {
       setLoading(false)
     }
   }
-
-  const esercizio = esercizi[0] // Prendiamo il primo esercizio come esempio
-  const [codice, setCodice] = useState(esercizio.codiceIniziale)
-  const [risultati, setRisultati] = useState<RisultatoTest[]>([])
-  const [inCorso, setInCorso] = useState(false)
 
   function esegui(): void {
     setInCorso(true)
@@ -90,43 +103,67 @@ function App() {
 
   return (
     <>
-      <h2>{esercizio.titolo}</h2>
-      <p>Categoria: {esercizio.categoria}</p>
-      <p>Difficoltà: {esercizio.difficolta}</p>
-      <p>{esercizio.testo}</p>
-      <Editor
-        height="300px"
-        defaultLanguage="javascript"
-        value={codice}
-        onChange={(nuovo) => setCodice(nuovo ?? '')}
-      />
-      <button onClick={esegui} disabled={inCorso}>
-        {inCorso ? 'In esecuzione...' : 'Esegui test'}
-      </button>
-      {risultati.length > 0 && (
-        <div>
-          <p>
-            {superati} su {risultati.length} superati
-          </p>
-          <ul>
-            {risultati.map((risultato, indice) => (
-              <li key={indice}>
-                {risultato.corretto ? 'OK' : 'NO'} - input: {JSON.stringify(risultato.input)} -
-                atteso: {JSON.stringify(risultato.atteso)} - ottenuto:{' '}
-                {JSON.stringify(risultato.ottenuto) ?? 'niente'}
-                {risultato.errore && <span> - errore: {risultato.errore}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-      <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
-      <button onClick={invia} disabled={loading}>
-        Invia
-      </button>
-      <p>{risposta}</p>
-      <p>{error}</p>
+      <section className="sezione">
+        <select value={indice} onChange={(e) => cambiaEsercizio(Number(e.target.value))}>
+          {esercizi.map((singolo, posizione) => (
+            <option key={singolo.id} value={posizione}>
+              {singolo.titolo} ({singolo.difficolta})
+            </option>
+          ))}
+        </select>
+
+        <h2>{esercizio.titolo}</h2>
+        <p>
+          Categoria: {esercizio.categoria} - Difficoltà: {esercizio.difficolta}
+        </p>
+        <p>{esercizio.testo}</p>
+
+        <Editor
+          height="320px"
+          defaultLanguage="javascript"
+          theme={scuro ? 'vs-dark' : 'light'}
+          value={codice}
+          onChange={(nuovo) => setCodice(nuovo ?? '')}
+        />
+
+        <button onClick={esegui} disabled={inCorso}>
+          {inCorso ? 'In esecuzione...' : 'Esegui test'}
+        </button>
+
+        {risultati.length > 0 && (
+          <div>
+            <p>
+              {superati} su {risultati.length} superati
+            </p>
+            <ul>
+              {risultati.map((risultato, posizione) => (
+                <li key={posizione} className={risultato.corretto ? 'esito-ok' : 'esito-no'}>
+                  {risultato.corretto ? 'OK' : 'NO'} - input: {JSON.stringify(risultato.input)} -
+                  atteso: {JSON.stringify(risultato.atteso)} - ottenuto:{' '}
+                  {JSON.stringify(risultato.ottenuto) ?? '—'}
+                  {risultato.errore && <span> - errore: {risultato.errore}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section className="sezione">
+        <h2>Tutor IA</h2>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+        />
+        <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
+        <button onClick={invia} disabled={loading}>
+          Invia
+        </button>
+        <p>{risposta}</p>
+        <p className="errore">{error}</p>
+      </section>
     </>
   )
 }

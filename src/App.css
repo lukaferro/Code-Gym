@@ -1,3 +1,70 @@
+.sezione {
+  text-align: left;
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sezione select,
+.sezione input,
+.sezione textarea,
+.sezione button {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.sezione button {
+  cursor: pointer;
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.sezione button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.sezione textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.sezione ul {
+  margin: 0;
+  padding-left: 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.esito-ok {
+  color: #15803d;
+}
+
+.esito-no {
+  color: #b91c1c;
+}
+
+.errore {
+  color: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .esito-ok {
+    color: #4ade80;
+  }
+
+  .esito-no,
+  .errore {
+    color: #f87171;
+  }
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
