@@ -27,6 +27,8 @@ Il progetto serve a farmi riprendere la mano con il codice, quindi:
 - React + TypeScript con Vite, funzioni serverless di Vercel in `api/`.
 - `npm run dev`: sviluppo locale (le chiamate `/api` passano dal proxy in `vite.config.ts` verso il sito online).
 - `node --env-file=.env.local scripts/prova-handler.ts`: prova locale di `api/ai.ts`.
+- `node scripts/crea-tabelle.ts`: crea la tabella dei tentativi (senza variabili usa `file:sviluppo.db`).
+- `node scripts/prova-tentativi.ts`: prova `api/tentativi.ts` con database locale, senza rete.
 - `npx vercel dev` non funziona su questo PC (errore sui link simbolici di Windows).
 - Il deploy parte da solo a ogni `git push` su `main`.
 

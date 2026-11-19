@@ -36,11 +36,14 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 | Esercizi (dati) | `src/esercizi.ts` |
 | Runner dei test | `src/runner.ts` |
 | API con fallback tra provider | `api/ai.ts` |
+| Controllo della password | `api/_auth.ts` |
+| Database Turso (SQLite) | `api/_db.ts` |
+| API dei tentativi | `api/tentativi.ts` |
 | Script di prova locali | `scripts/prova.mjs`, `scripts/prova-handler.ts`, `scripts/prova-online.mjs` |
 
 API: `POST /api/ai`, header `x-app-password`, body `{ "messages": [{ "role": "user", "content": "..." }] }`, risposta `{ "provider": "...", "text": "..." }`.
 
-Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `APP_PASSWORD`. Stanno in `.env.local` e nelle impostazioni di Vercel.
+Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `APP_PASSWORD`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`. Stanno in `.env.local` e nelle impostazioni di Vercel.
 
 ## Stato
 

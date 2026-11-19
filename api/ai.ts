@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { autorizza } from './_auth.ts';
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -46,7 +47,10 @@ async function callProvider(provider: Provider, messages: Message[]): Promise<st
         const detail = await res.text();
         throw new Error(`HTTP error! status: ${res.status} - ${detail}`);
     }
-    const data = await res.json();
+    // res.json() restituisce unknown: dichiariamo solo il pezzo di risposta che ci serve
+    const data = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+    };
     const text = data.choices?.[0]?.message?.content;
     if (!text) throw new Error('Risposta vuota');
     return text;
@@ -74,11 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Metodo non consentito' });
     }
 
-    const intestazionePassword = req.headers['x-app-password'];
-    const password = Array.isArray(intestazionePassword) ? intestazionePassword[0] : intestazionePassword;
-    if (!process.env.APP_PASSWORD || password !== process.env.APP_PASSWORD) {
-        return res.status(401).json({ error: 'Non autorizzato' });
-    }
+    if (!autorizza(req, res)) return;
 
     const messages = req.body?.messages;
     if (!Array.isArray(messages) || messages.length === 0) {
