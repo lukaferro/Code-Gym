@@ -1,11 +1,73 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { autorizza } from '../lib/auth.ts';
-import { creaClient, salvaTentativo } from '../lib/db.ts';
-import type { Tentativo } from '../src/tipi.ts';
+import type { Client } from '@libsql/client';
+
+// Copia di src/tipi.ts: gli endpoint dentro api/ devono essere autosufficienti
+// (Vercel non spedisce i file condivisi dentro api/ né li risolve da fuori).
+// Se cambi un campo qui, cambialo anche in src/tipi.ts.
+type Tentativo = {
+    id?: number;
+    esercizioId: string;
+    esito: boolean;
+    superati: number;
+    totale: number;
+    durataMs: number;
+    indizi: number;
+    errori: string[];
+    data: string;
+};
 
 const MAX_ERRORI = 5;
 const MAX_LUNGHEZZA_ERRORE = 300;
 const MAX_DURATA_MS = 60 * 60 * 1000;
+
+// Copia di lib/auth.ts: stessa ragione della copia del tipo qui sopra.
+function autorizza(req: VercelRequest, res: VercelResponse): boolean {
+    const intestazione = req.headers['x-app-password'];
+    const password = Array.isArray(intestazione) ? intestazione[0] : intestazione;
+
+    if (!process.env.APP_PASSWORD || password !== process.env.APP_PASSWORD) {
+        res.status(401).json({ error: 'Non autorizzato' });
+        return false;
+    }
+
+    return true;
+}
+
+// Il tipo di client dipende dalla URL:
+// - libsql://... -> Turso via HTTP: funziona su Vercel, nessun binario nativo
+// - file:...     -> file SQLite locale, solo per gli script di prova sul PC
+async function creaClient(): Promise<Client> {
+    const url = process.env.TURSO_DATABASE_URL;
+    if (!url) throw new Error('TURSO_DATABASE_URL non impostata');
+
+    if (url.startsWith('file:')) {
+        const { createClient } = await import('@libsql/client');
+        return createClient({ url });
+    }
+
+    const { createClient } = await import('@libsql/client/web');
+    return createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+}
+
+async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
+    const risultato = await db.execute({
+        sql: `INSERT INTO tentativi
+              (esercizio_id, esito, superati, totale, durata_ms, indizi, errori, data)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+            tentativo.esercizioId,
+            tentativo.esito ? 1 : 0,
+            tentativo.superati,
+            tentativo.totale,
+            tentativo.durataMs,
+            tentativo.indizi,
+            JSON.stringify(tentativo.errori),
+            tentativo.data,
+        ],
+    });
+
+    return Number(risultato.lastInsertRowid ?? 0);
+}
 
 function intero(valore: unknown, minimo: number, massimo: number): number | null {
     if (typeof valore !== 'number' || !Number.isInteger(valore)) return null;

@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { autorizza } from '../lib/auth.ts';
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -30,6 +29,20 @@ const openrouter = {
 };
 
 const providers: Provider[] = [gemini, groq, openrouter];
+
+// Controllo della password, copiato in ogni endpoint perché Vercel non
+// include nel pacchetto i file condivisi dentro api/ (vedi PIANO.md).
+function autorizza(req: VercelRequest, res: VercelResponse): boolean {
+    const intestazione = req.headers['x-app-password'];
+    const password = Array.isArray(intestazione) ? intestazione[0] : intestazione;
+
+    if (!process.env.APP_PASSWORD || password !== process.env.APP_PASSWORD) {
+        res.status(401).json({ error: 'Non autorizzato' });
+        return false;
+    }
+
+    return true;
+}
 
 async function callProvider(provider: Provider, messages: Message[]): Promise<string> {
     const res = await fetch(provider.url, {

@@ -36,10 +36,12 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 | Esercizi (dati) | `src/esercizi.ts` |
 | Runner dei test | `src/runner.ts` |
 | API con fallback tra provider | `api/ai.ts` |
-| Controllo della password | `lib/auth.ts` |
-| Database Turso (SQLite) | `lib/db.ts` |
+| Controllo della password | dentro `api/ai.ts` e `api/tentativi.ts` (copiato) |
+| Database Turso (SQLite) | `lib/db.ts` per gli script; dentro `api/tentativi.ts` per l'endpoint |
 | API dei tentativi | `api/tentativi.ts` |
 | Script di prova locali | `scripts/prova.mjs`, `scripts/prova-handler.ts`, `scripts/prova-online.mjs` |
+
+Gli endpoint dentro `api/` sono autosufficienti: Vercel non spedisce i file condivisi messi in `api/` e non risolve gli import verso `lib/`. Per questo la password, il tipo `Tentativo` e l'accesso al database sono duplicati lì dentro: le copie vanno tenute allineate con `lib/db.ts` e `src/tipi.ts`.
 
 API: `POST /api/ai`, header `x-app-password`, body `{ "messages": [{ "role": "user", "content": "..." }] }`, risposta `{ "provider": "...", "text": "..." }`.
 
