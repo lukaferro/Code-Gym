@@ -5,8 +5,21 @@ import { risultatiTempoScaduto } from './runner'
 import type { RisultatoTest } from './runner'
 import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
+import { inviaTentativo } from './tentativi'
+import type { Tentativo } from './tipi'
 
 const LIMITE_MS = 3000
+
+// performance.now() è impuro (cambia a ogni chiamata) e il linter di React lo
+// vieta dentro il componente: qui è lecito, misura il tempo di un click.
+function adesso(): number {
+  return performance.now()
+}
+
+// Letta una volta sola, al caricamento del file: dentro il componente sarebbe
+// una lettura impura a ogni disegno.
+const passwordSalvata =
+  typeof localStorage === 'undefined' ? '' : (localStorage.getItem('code-gym-password') ?? '')
 
 function App() {
   const scuro = useTemaScuro()
@@ -14,9 +27,15 @@ function App() {
   // stato del tutor IA
   const [domanda, setDomanda] = useState('')
   const [risposta, setRisposta] = useState('')
-  const [password, setPassword] = useState('')
+  const [password, setPassword] = useState(passwordSalvata)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  function cambiaPassword(nuova: string): void {
+    setPassword(nuova)
+    if (nuova) localStorage.setItem('code-gym-password', nuova)
+    else localStorage.removeItem('code-gym-password')
+  }
 
   // stato dell'esercizio
   const [indice, setIndice] = useState(0)
@@ -24,12 +43,14 @@ function App() {
   const [codice, setCodice] = useState(esercizio.codiceIniziale)
   const [risultati, setRisultati] = useState<RisultatoTest[]>([])
   const [inCorso, setInCorso] = useState(false)
+  const [salvataggio, setSalvataggio] = useState('')
 
   function cambiaEsercizio(nuovoIndice: number): void {
     setIndice(nuovoIndice)
     // l'editor non si svuota da solo: rimettiamo il codice iniziale del nuovo esercizio
     setCodice(esercizi[nuovoIndice].codiceIniziale)
     setRisultati([])
+    setSalvataggio('')
   }
 
   async function invia() {
@@ -61,14 +82,22 @@ function App() {
 
   function esegui(): void {
     setInCorso(true)
+    setSalvataggio('')
+
+    const inizio = adesso()
+
+    function finisci(nuovi: RisultatoTest[]): void {
+      const durataMs = Math.round(adesso() - inizio)
+      setRisultati(nuovi)
+      chiudi()
+      void salva(nuovi, durataMs)
+    }
 
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
     // Se il worker non risponde entro il limite, lo terminiamo noi.
     const timer = setTimeout(() => {
-      worker.terminate()
-      setRisultati(risultatiTempoScaduto(esercizio))
-      setInCorso(false)
+      finisci(risultatiTempoScaduto(esercizio))
     }, LIMITE_MS)
 
     // funzione unica per chiudere tutto senza dimenticare il timer
@@ -79,12 +108,11 @@ function App() {
     }
 
     worker.onmessage = (evento: MessageEvent<RisultatoTest[]>) => {
-      setRisultati(evento.data)
-      chiudi()
+      finisci(evento.data)
     }
 
     worker.onerror = (evento: ErrorEvent) => {
-      setRisultati([
+      finisci([
         {
           input: [],
           atteso: undefined,
@@ -93,10 +121,32 @@ function App() {
           errore: evento.message || 'Errore nel worker',
         },
       ])
-      chiudi()
     }
 
     worker.postMessage({ codice, esercizio })
+  }
+
+  async function salva(risultati: RisultatoTest[], durataMs: number): Promise<void> {
+    const superati = risultati.filter((r) => r.corretto).length
+    const tentativo: Tentativo = {
+      esercizioId: esercizio.id,
+      esito: superati === risultati.length,
+      superati,
+      totale: risultati.length,
+      durataMs,
+      indizi: 0,
+      errori: risultati
+        .flatMap((r) => (r.errore ? [r.errore] : []))
+        .slice(0, 5),
+      data: new Date().toISOString(),
+    }
+
+    try {
+      await inviaTentativo(tentativo, password)
+      setSalvataggio('ok')
+    } catch (err) {
+      setSalvataggio(err instanceof Error ? err.message : 'Salvataggio fallito')
+    }
   }
 
   const superati = risultati.filter((risultato) => risultato.corretto).length
@@ -147,6 +197,11 @@ function App() {
             </ul>
           </div>
         )}
+        {salvataggio && (
+          <p className={salvataggio === 'ok' ? 'esito-ok' : 'esito-no'}>
+            {salvataggio === 'ok' ? 'Tentativo Salvato' : `Salvataggio non riuscito: ${salvataggio}`}
+          </p>
+        )}
       </section>
 
       <section className="sezione">
@@ -154,7 +209,7 @@ function App() {
         <input
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => cambiaPassword(e.target.value)}
           placeholder="Password"
         />
         <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
