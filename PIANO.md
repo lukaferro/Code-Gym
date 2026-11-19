@@ -24,7 +24,7 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 - Backend: funzioni serverless di Vercel nella cartella `api/`.
 - IA gratuita con fallback: Gemini, poi Groq, poi OpenRouter (modelli `:free`).
 - Accesso all'API protetto da una password inviata nell'header `x-app-password`.
-- Database: da scegliere tra Turso (SQLite ospitato) e Supabase, dietro un modulo `db.ts`.
+- Database: Turso (SQLite ospitato), scelto invece di Supabase perché i progetti gratuiti Supabase si mettono in pausa dopo una settimana di inattività e auth/storage non servono.
 - Esecuzione del codice: JS/TS nel browser (Web Worker), Python con Pyodide più avanti; C# e Java quando avrò un server (Raspberry).
 - Bot Telegram come ultima fase; in futuro tutto può migrare su un Raspberry.
 
@@ -50,13 +50,13 @@ Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OP
 ## Stato
 
 - [x] Fase 0: progetto React, repo GitHub, deploy Vercel, chiavi gratuite, `api/ai.ts` con fallback e password, pagina collegata all'API
-- [x] Fase 1 (parziale): tipo `Esercizio` e primo esercizio, editor Monaco, `runner.ts` con test
+- [x] Fase 1: esercizi, runner con test, editor Monaco, salvataggio dei tentativi
 - [x] Bottone "Esegui test" e risultati mostrati nella pagina
 - [x] Web Worker con limite di tempo (ciclo infinito)
 - [x] Selettore dell'esercizio nella pagina
 - [x] Altri esercizi (almeno 20)
-- [ ] Salvataggio dei tentativi (modulo `db.ts`)
-- [ ] Password ricordata dal browser (`localStorage`)
+- [x] Salvataggio dei tentativi (modulo `db.ts`)
+- [x] Password ricordata dal browser (`localStorage`)
 
 ## Fasi
 
