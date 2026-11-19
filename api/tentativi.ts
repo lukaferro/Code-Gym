@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { autorizza } from './_auth.ts';
-import { creaClient, salvaTentativo } from './_db.ts';
+import { autorizza } from '../lib/auth.ts';
+import { creaClient, salvaTentativo } from '../lib/db.ts';
 import type { Tentativo } from '../src/tipi.ts';
 
 const MAX_ERRORI = 5;

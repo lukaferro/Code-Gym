@@ -36,8 +36,8 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 | Esercizi (dati) | `src/esercizi.ts` |
 | Runner dei test | `src/runner.ts` |
 | API con fallback tra provider | `api/ai.ts` |
-| Controllo della password | `api/_auth.ts` |
-| Database Turso (SQLite) | `api/_db.ts` |
+| Controllo della password | `lib/auth.ts` |
+| Database Turso (SQLite) | `lib/db.ts` |
 | API dei tentativi | `api/tentativi.ts` |
 | Script di prova locali | `scripts/prova.mjs`, `scripts/prova-handler.ts`, `scripts/prova-online.mjs` |
 

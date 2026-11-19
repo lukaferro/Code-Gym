@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { autorizza } from './_auth.ts';
+import { autorizza } from '../lib/auth.ts';
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
 

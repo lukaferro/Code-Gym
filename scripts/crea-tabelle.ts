@@ -1,4 +1,4 @@
-import { creaClient, creaTabella } from '../api/_db.ts';
+import { creaClient, creaTabella } from '../lib/db.ts';
 
 // Se non c'è TURSO_DATABASE_URL usiamo un file locale, così puoi provare tutto senza account.
 process.env.TURSO_DATABASE_URL ??= 'file:sviluppo.db';

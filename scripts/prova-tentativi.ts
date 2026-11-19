@@ -3,7 +3,7 @@
 // Non usa la rete e non consuma quote IA.
 import { rmSync } from 'node:fs';
 import handler from '../api/tentativi.ts';
-import { creaClient, creaTabella, leggiTentativi } from '../api/_db.ts';
+import { creaClient, creaTabella, leggiTentativi } from '../lib/db.ts';
 
 process.env.APP_PASSWORD = 'prova';
 process.env.TURSO_DATABASE_URL = 'file:prova-tentativi.db';
