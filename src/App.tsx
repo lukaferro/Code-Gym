@@ -80,7 +80,7 @@ function App() {
     }
   }
 
-  function esegui(): void {
+  function esegui(deveSalvare: boolean): void {
     setInCorso(true)
     setSalvataggio('')
 
@@ -90,7 +90,8 @@ function App() {
       const durataMs = Math.round(adesso() - inizio)
       setRisultati(nuovi)
       chiudi()
-      void salva(nuovi, durataMs)
+      // La scelta viaggia come parametro: lo stato sarebbe ancora quello vecchio.
+      if (deveSalvare) void salvaTentativo(nuovi, durataMs)
     }
 
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -126,7 +127,7 @@ function App() {
     worker.postMessage({ codice, esercizio })
   }
 
-  async function salva(risultati: RisultatoTest[], durataMs: number): Promise<void> {
+  async function salvaTentativo(risultati: RisultatoTest[], durataMs: number): Promise<void> {
     const superati = risultati.filter((r) => r.corretto).length
     const tentativo: Tentativo = {
       esercizioId: esercizio.id,
@@ -177,9 +178,17 @@ function App() {
           onChange={(nuovo) => setCodice(nuovo ?? '')}
         />
 
-        <button onClick={esegui} disabled={inCorso}>
-          {inCorso ? 'In esecuzione...' : 'Esegui test'}
-        </button>
+        <div className="bottoni">
+          <button onClick={() => esegui(false)} disabled={inCorso}>
+            {inCorso ? 'In esecuzione...' : 'Prova'}
+          </button>
+          <button onClick={() => esegui(true)} disabled={inCorso}>
+            {inCorso ? 'In esecuzione...' : 'Consegna'}
+          </button>
+        </div>
+        <p className="nota">
+          Prova esegue i test senza salvare niente. Consegna salva il tentativo nelle statistiche.
+        </p>
 
         {risultati.length > 0 && (
           <div>
