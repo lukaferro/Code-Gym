@@ -1,5 +1,6 @@
 export type Esercizio = {
   id: string
+  materia: string
   titolo: string
   categoria: string
   difficolta: 'facile' | 'medio' | 'difficile'
@@ -12,6 +13,7 @@ export type Esercizio = {
 export const esercizi: Esercizio[] = [
   {
     id: 'inverti-stringa',
+    materia: 'javascript',
     titolo: 'Inverti una stringa',
     categoria: 'stringhe',
     difficolta: 'facile',
@@ -27,6 +29,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'conta-vocali',
+    materia: 'javascript',
     titolo: 'Conta le vocali',
     categoria: 'stringhe',
     difficolta: 'facile',
@@ -43,6 +46,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'palindromo',
+    materia: 'javascript',
     titolo: 'Parola palindroma',
     categoria: 'stringhe',
     difficolta: 'facile',
@@ -59,6 +63,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'capitalizza',
+    materia: 'javascript',
     titolo: 'Prima lettera maiuscola',
     categoria: 'stringhe',
     difficolta: 'facile',
@@ -75,6 +80,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'conta-parole',
+    materia: 'javascript',
     titolo: 'Conta le parole',
     categoria: 'stringhe',
     difficolta: 'facile',
@@ -91,6 +97,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'parola-piu-lunga',
+    materia: 'javascript',
     titolo: 'La parola più lunga',
     categoria: 'stringhe',
     difficolta: 'medio',
@@ -107,6 +114,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'somma-array',
+    materia: 'javascript',
     titolo: 'Somma di un array',
     categoria: 'array',
     difficolta: 'facile',
@@ -123,6 +131,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'massimo',
+    materia: 'javascript',
     titolo: 'Il numero più grande',
     categoria: 'array',
     difficolta: 'facile',
@@ -139,6 +148,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'media',
+    materia: 'javascript',
     titolo: 'Media dei numeri',
     categoria: 'numeri',
     difficolta: 'facile',
@@ -155,6 +165,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'conta-pari',
+    materia: 'javascript',
     titolo: 'Conta i numeri pari',
     categoria: 'array',
     difficolta: 'facile',
@@ -171,6 +182,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'inverti-array',
+    materia: 'javascript',
     titolo: 'Inverti un array',
     categoria: 'array',
     difficolta: 'facile',
@@ -187,6 +199,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'trova-indice',
+    materia: 'javascript',
     titolo: 'Trova la posizione',
     categoria: 'array',
     difficolta: 'facile',
@@ -203,6 +216,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'fattoriale',
+    materia: 'javascript',
     titolo: 'Fattoriale',
     categoria: 'ricorsione',
     difficolta: 'facile',
@@ -219,6 +233,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'fibonacci',
+    materia: 'javascript',
     titolo: 'Fibonacci',
     categoria: 'ricorsione',
     difficolta: 'medio',
@@ -235,6 +250,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'somma-cifre',
+    materia: 'javascript',
     titolo: 'Somma delle cifre',
     categoria: 'numeri',
     difficolta: 'facile',
@@ -251,6 +267,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'e-primo',
+    materia: 'javascript',
     titolo: 'Numero primo',
     categoria: 'numeri',
     difficolta: 'medio',
@@ -268,6 +285,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'fizzbuzz',
+    materia: 'javascript',
     titolo: 'FizzBuzz',
     categoria: 'numeri',
     difficolta: 'medio',
@@ -303,6 +321,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'ordina-numeri',
+    materia: 'javascript',
     titolo: 'Ordina i numeri',
     categoria: 'array',
     difficolta: 'medio',
@@ -319,6 +338,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'intersezione',
+    materia: 'javascript',
     titolo: 'Elementi in comune',
     categoria: 'array',
     difficolta: 'medio',
@@ -335,6 +355,7 @@ export const esercizi: Esercizio[] = [
   },
   {
     id: 'appiattisci',
+    materia: 'javascript',
     titolo: 'Appiattisci un array',
     categoria: 'array',
     difficolta: 'medio',

@@ -2,6 +2,7 @@
 export type Tentativo = {
   id?: number
   esercizioId: string
+  materia: string
   esito: boolean
   superati: number
   totale: number

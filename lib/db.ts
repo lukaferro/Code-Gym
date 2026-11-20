@@ -22,6 +22,7 @@ export async function creaTabella(db: Client): Promise<void> {
         CREATE TABLE IF NOT EXISTS tentativi (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             esercizio_id TEXT NOT NULL,
+            materia TEXT NOT NULL DEFAULT 'javascript',
             esito INTEGER NOT NULL,
             superati INTEGER NOT NULL,
             totale INTEGER NOT NULL,
@@ -31,6 +32,15 @@ export async function creaTabella(db: Client): Promise<void> {
             data TEXT NOT NULL
         )
     `);
+
+    // Le tabelle create prima dell'arrivo delle materie non hanno la colonna:
+    // la aggiungiamo senza perdere le righe esistenti.
+    const colonne = await db.execute("SELECT name FROM pragma_table_info('tentativi')");
+    const haMateria = colonne.rows.some((riga) => riga.name === 'materia');
+    if (!haMateria) {
+        await db.execute("ALTER TABLE tentativi ADD COLUMN materia TEXT NOT NULL DEFAULT 'javascript'");
+    }
+
     await db.execute('CREATE INDEX IF NOT EXISTS idx_tentativi_esercizio ON tentativi(esercizio_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_tentativi_data ON tentativi(data)');
 }
@@ -38,10 +48,11 @@ export async function creaTabella(db: Client): Promise<void> {
 export async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
     const risultato = await db.execute({
         sql: `INSERT INTO tentativi
-              (esercizio_id, esito, superati, totale, durata_ms, indizi, errori, data)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              (esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
             tentativo.esercizioId,
+            tentativo.materia,
             tentativo.esito ? 1 : 0,
             tentativo.superati,
             tentativo.totale,
@@ -57,7 +68,7 @@ export async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<
 
 export async function leggiTentativi(db: Client, limite = 50): Promise<Tentativo[]> {
     const risultato = await db.execute({
-        sql: `SELECT id, esercizio_id, esito, superati, totale, durata_ms, indizi, errori, data
+        sql: `SELECT id, esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data
               FROM tentativi ORDER BY id DESC LIMIT ?`,
         args: [limite],
     });
@@ -65,6 +76,7 @@ export async function leggiTentativi(db: Client, limite = 50): Promise<Tentativo
     return risultato.rows.map((riga) => ({
         id: Number(riga.id),
         esercizioId: String(riga.esercizio_id),
+        materia: String(riga.materia),
         esito: Number(riga.esito) === 1,
         superati: Number(riga.superati),
         totale: Number(riga.totale),

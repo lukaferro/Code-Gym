@@ -32,6 +32,7 @@ function makeRes() {
 
 const valido = {
   esercizioId: 'inverti-stringa',
+  materia: 'javascript',
   esito: true,
   superati: 3,
   totale: 3,
@@ -71,6 +72,15 @@ await prova(
   400
 );
 await prova(
+  'materia mancante',
+  {
+    method: 'POST',
+    headers: { 'x-app-password': 'prova' },
+    body: { ...valido, materia: undefined },
+  },
+  400
+);
+await prova(
   'troppi errori',
   {
     method: 'POST',
@@ -100,6 +110,6 @@ const lettura = await creaClient();
 const tentativi = await leggiTentativi(lettura);
 console.log('\nRighe salvate:', tentativi.length);
 for (const t of tentativi) {
-  console.log(' ', t.id, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, t.errori);
+  console.log(' ', t.id, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, t.errori);
 }
 lettura.close();

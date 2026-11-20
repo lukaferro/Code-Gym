@@ -7,6 +7,7 @@ import type { Client } from '@libsql/client';
 type Tentativo = {
     id?: number;
     esercizioId: string;
+    materia: string;
     esito: boolean;
     superati: number;
     totale: number;
@@ -52,10 +53,11 @@ async function creaClient(): Promise<Client> {
 async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
     const risultato = await db.execute({
         sql: `INSERT INTO tentativi
-              (esercizio_id, esito, superati, totale, durata_ms, indizi, errori, data)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              (esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
             tentativo.esercizioId,
+            tentativo.materia,
             tentativo.esito ? 1 : 0,
             tentativo.superati,
             tentativo.totale,
@@ -86,6 +88,11 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
         return null;
     }
 
+    const materia = dati.materia;
+    if (typeof materia !== 'string' || materia.length === 0 || materia.length > 100) {
+        return null;
+    }
+
     if (typeof dati.esito !== 'boolean') return null;
 
     const superati = intero(dati.superati, 0, 1000);
@@ -104,6 +111,7 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
 
     return {
         esercizioId,
+        materia,
         esito: dati.esito,
         superati,
         totale,

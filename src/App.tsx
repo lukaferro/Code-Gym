@@ -130,6 +130,7 @@ function App() {
     const superati = risultati.filter((r) => r.corretto).length
     const tentativo: Tentativo = {
       esercizioId: esercizio.id,
+      materia: esercizio.materia,
       esito: superati === risultati.length,
       superati,
       totale: risultati.length,
