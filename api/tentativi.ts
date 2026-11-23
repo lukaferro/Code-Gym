@@ -123,7 +123,44 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
     };
 }
 
+// Legge tutti i tentativi, dal più vecchio al più recente: serve al backup.
+async function leggiTentativi(db: Client, limite = 5000): Promise<Tentativo[]> {
+    const risultato = await db.execute({
+        sql: `SELECT id, esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data
+              FROM tentativi ORDER BY id LIMIT ?`,
+        args: [limite],
+    });
+
+    return risultato.rows.map((riga) => ({
+        id: Number(riga.id),
+        esercizioId: String(riga.esercizio_id),
+        materia: String(riga.materia),
+        esito: Number(riga.esito) === 1,
+        superati: Number(riga.superati),
+        totale: Number(riga.totale),
+        durataMs: Number(riga.durata_ms),
+        indizi: Number(riga.indizi),
+        errori: JSON.parse(String(riga.errori)) as string[],
+        data: String(riga.data),
+    }));
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method === 'GET') {
+        if (!autorizza(req, res)) return;
+        try {
+            const db = await creaClient();
+            const tentativi = await leggiTentativi(db);
+            return res.status(200).json({ versione: 1, tentativi });
+        } catch (errore) {
+            console.error(
+                'Lettura tentativi fallita:',
+                errore instanceof Error ? errore.message : String(errore)
+            );
+            return res.status(503).json({ error: 'Lettura non disponibile' });
+        }
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Metodo non consentito' });
     }

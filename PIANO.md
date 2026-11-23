@@ -110,21 +110,22 @@ Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OP
 
 Prossimi passi, in ordine:
 
-1. [ ] **In corso:** `tutor.ts` con `promptTestLivello(materia)`
-2. [ ] Menu di scelta della materia nella pagina; filtro degli esercizi per materia
-3. [ ] Pulsanti **Prova** e **Consegna**; salvataggio delle consegne su Turso e backup Esporta/Importa
-4. [ ] Timeout (circa 8 secondi) per ogni provider in `api/ai.ts`
-5. [ ] Test di livello collegato alla chat, con la conversazione che si accumula
-6. [ ] Pulsante "Aiutami" con indizi a livelli, e "Chiedi a Gemini Pro"
-7. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
-8. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
+1. [x] `tutor.ts` con `promptTestLivello(materia)`
+2. [x] Menu di scelta della materia nella pagina; filtro degli esercizi per materia
+3. [x] Pulsanti **Prova** e **Consegna**; salvataggio delle consegne su Turso
+4. [x] Timeout (circa 8 secondi) per ogni provider in `api/ai.ts`
+5. [x] Test di livello collegato alla chat, con la conversazione che si accumula
+6. [ ] **In corso:** backup Esporta/Importa dei tentativi in JSON
+7. [ ] Pulsante "Aiutami" con indizi a livelli, e "Chiedi a Gemini Pro"
+8. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
+9. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
 
 ## Fasi
 
 ### Fase 2: insegnante IA (cuore del progetto)
 
 - **2a. Materie gestibili dall'app.** Menu di scelta, poi `materieStore.ts`, poi la schermata per aggiungere, modificare ed eliminare, e il suggerimento degli argomenti da parte dell'IA.
-- **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`) e a ogni invio mando tutta la lista a `/api/ai`.
+- **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`) e a ogni invio mando tutta la lista a `/api/ai`. Il profilo per ora resta nella chat: verrà salvato con il profilo della Fase 3.
 - **2c. Tutor sugli errori.** Pulsante "Aiutami" con tre livelli: indizio vago, indizio mirato, spiegazione completa. L'IA risponde in JSON con spiegazione e tag dell'errore (`async`, `array`, `complessità`, ...). Il prompt vieta la soluzione completa prima del livello 3. Opzione "Chiedi a Gemini Pro".
 - **2d. Esercizi generati e tipi vari.** "Genera un esercizio su questo argomento", con validazione: l'IA fornisce anche una soluzione di riferimento, il runner la esegue contro i test e l'esercizio si scarta se la fallisce. Tipi: scrivere una funzione, trovare il bug, prevedere l'output, spiegare un concetto, complessità, code review.
 - **2e. Prompt di sistema dell'insegnante** in `src/tutor.ts`, con regole di tono, di sequenza degli aiuti e di formato delle risposte.

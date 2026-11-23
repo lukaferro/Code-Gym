@@ -55,7 +55,7 @@ await prova(
   { method: 'POST', headers: { 'x-app-password': 'sbagliata' }, body: valido },
   401
 );
-await prova('GET', { method: 'GET', headers: { 'x-app-password': 'prova' } }, 405);
+await prova('GET senza password', { method: 'GET', headers: {} }, 401);
 await prova(
   'esito non booleano',
   { method: 'POST', headers: { 'x-app-password': 'prova' }, body: { ...valido, esito: 'si' } },
@@ -113,3 +113,9 @@ for (const t of tentativi) {
   console.log(' ', t.id, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, t.errori);
 }
 lettura.close();
+
+// Il backup passa da qui: GET protetta che restituisce tutto.
+const esportazione = await prova('GET con password', { method: 'GET', headers: { 'x-app-password': 'prova' } }, 200);
+const esportati = (esportazione.corpo as { tentativi?: unknown[] }).tentativi ?? [];
+console.log(esportati.length === 2 ? 'OK      GET restituisce 2 tentativi' : `FALLITO GET restituisce ${esportati.length} tentativi`);
+

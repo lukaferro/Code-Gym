@@ -7,7 +7,7 @@ import { risultatiTempoScaduto } from './runner'
 import type { RisultatoTest } from './runner'
 import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
-import { inviaTentativo } from './tentativi'
+import { inviaTentativo, scaricaTentativi } from './tentativi'
 import type { Tentativo } from './tipi'
 import { promptTestLivello } from './tutor'
 import type { Messaggio } from './tutor'
@@ -72,6 +72,10 @@ function App() {
   const [chatErrore, setChatErrore] = useState('')
   const materiaCorrente =
     materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
+
+  // stato del backup
+  const [backupMessaggio, setBackupMessaggio] = useState('')
+  const [backupInCorso, setBackupInCorso] = useState(false)
 
   function cambiaMateria(nuovaMateria: string): void {
     setMateriaScelta(nuovaMateria)
@@ -142,6 +146,54 @@ function App() {
   function iniziaTest(): void {
     setChatErrore('')
     void inviaMessaggio('Iniziamo il test di livello.', [])
+  }
+
+  async function esportaTentativi(): Promise<void> {
+    setBackupMessaggio('')
+    setBackupInCorso(true)
+    try {
+      const tentativi = await scaricaTentativi(password)
+      const contenuto = { versione: 1, esportato: new Date().toISOString(), tentativi }
+      const blob = new Blob([JSON.stringify(contenuto, null, 2)], { type: 'application/json' })
+      const indirizzo = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = indirizzo
+      link.download = `code-gym-tentativi-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      URL.revokeObjectURL(indirizzo)
+      setBackupMessaggio(`Esportati ${tentativi.length} tentativi.`)
+    } catch (err) {
+      setBackupMessaggio(err instanceof Error ? err.message : 'Esportazione fallita')
+    } finally {
+      setBackupInCorso(false)
+    }
+  }
+
+  // L'import rimanda ogni riga all'API: la validazione del server vale per il file.
+  async function importaTentativi(file: File): Promise<void> {
+    setBackupMessaggio('')
+    setBackupInCorso(true)
+    let importati = 0
+    try {
+      const dati: unknown = JSON.parse(await file.text())
+      const elenco =
+        Array.isArray(dati) ? dati : ((dati as { tentativi?: unknown }).tentativi ?? [])
+      if (!Array.isArray(elenco) || elenco.length === 0) {
+        throw new Error('Il file non contiene tentativi')
+      }
+      for (const voce of elenco) {
+        await inviaTentativo(voce as Tentativo, password)
+        importati += 1
+      }
+      setBackupMessaggio(`Importati ${importati} tentativi.`)
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : 'Importazione fallita'
+      setBackupMessaggio(
+        importati > 0 ? `Importati ${importati}, poi errore: ${motivo}` : `Errore: ${motivo}`
+      )
+    } finally {
+      setBackupInCorso(false)
+    }
   }
 
   async function invia() {
@@ -381,6 +433,34 @@ function App() {
           </button>
         </form>
         <p className="errore">{chatErrore}</p>
+      </section>
+
+      <section className="sezione">
+        <h2>Backup dei tentativi</h2>
+        <p className="nota">
+          Esporta scarica tutti i tentativi in un file JSON. Importa rimanda al server le righe del
+          file: quelle già presenti vengono aggiunte di nuovo.
+        </p>
+        <div className="bottoni">
+          <button onClick={() => void esportaTentativi()} disabled={backupInCorso}>
+            Esporta
+          </button>
+          <label className="bottone-file">
+            Importa
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={backupInCorso}
+              onChange={(evento) => {
+                const file = evento.target.files?.[0]
+                // senza questo, lo stesso file non fa partire un secondo onChange
+                evento.target.value = ''
+                if (file) void importaTentativi(file)
+              }}
+            />
+          </label>
+        </div>
+        <p className="nota">{backupMessaggio}</p>
       </section>
 
       <section className="sezione">

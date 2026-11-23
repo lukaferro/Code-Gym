@@ -83,6 +83,21 @@
   padding: 8px 10px;
 }
 
+/* L'input file non si può vestire: lo nascondiamo e facciamo da bottone la label. */
+.bottone-file {
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.bottone-file input {
+  display: none;
+}
+
 .sezione form {
   display: flex;
   flex-direction: column;
