@@ -252,6 +252,12 @@ function App() {
   return (
     <>
       <section className="sezione">
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => cambiaPassword(e.target.value)}
+          placeholder="Password"
+        />
         <select value={materiaScelta} onChange={(e) => cambiaMateria(e.target.value)}>
           {materieVisibili.map((singola) => (
             <option key={singola.id} value={singola.id}>
@@ -383,12 +389,6 @@ function App() {
           Una domanda singola, senza contesto: per farlo ragionare su un esercizio usa il test di
           livello o, più avanti, il pulsante "Aiutami".
         </p>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => cambiaPassword(e.target.value)}
-          placeholder="Password"
-        />
         <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
         <button onClick={invia} disabled={loading}>
           Invia
