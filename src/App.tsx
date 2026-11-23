@@ -9,6 +9,8 @@ import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
 import { inviaTentativo } from './tentativi'
 import type { Tentativo } from './tipi'
+import { promptTestLivello } from './tutor'
+import type { Messaggio } from './tutor'
 
 const LIMITE_MS = 3000
 
@@ -63,6 +65,14 @@ function App() {
   const [inCorso, setInCorso] = useState(false)
   const [salvataggio, setSalvataggio] = useState('')
 
+  // stato del test di livello
+  const [conversazione, setConversazione] = useState<Messaggio[]>([])
+  const [bozza, setBozza] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatErrore, setChatErrore] = useState('')
+  const materiaCorrente =
+    materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
+
   function cambiaMateria(nuovaMateria: string): void {
     setMateriaScelta(nuovaMateria)
     localStorage.setItem('code-gym-materia', nuovaMateria)
@@ -72,6 +82,9 @@ function App() {
     setCodice(primo?.codiceIniziale ?? '')
     setRisultati([])
     setSalvataggio('')
+    // Una conversazione su Git non vale per JavaScript.
+    setConversazione([])
+    setChatErrore('')
   }
 
   function cambiaEsercizio(nuovoIndice: number): void {
@@ -80,6 +93,55 @@ function App() {
     setCodice(eserciziMateria[nuovoIndice].codiceIniziale)
     setRisultati([])
     setSalvataggio('')
+  }
+
+  // base esplicito: dopo "Inizia test" lo stato conversazione non è ancora aggiornato
+  async function inviaMessaggio(
+    testo: string,
+    base: Messaggio[] = conversazione
+  ): Promise<void> {
+    const pulito = testo.trim()
+    if (!pulito || chatLoading) return
+
+    const nuovi: Messaggio[] = [...base, { role: 'user', content: pulito }]
+    setConversazione(nuovi)
+    setBozza('')
+    setChatLoading(true)
+    setChatErrore('')
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-password': password,
+        },
+        body: JSON.stringify({
+          // il prompt delle regole viaggia come primo messaggio di sistema
+          messages: [
+            { role: 'system', content: promptTestLivello(materiaCorrente) },
+            ...nuovi,
+          ],
+        }),
+      })
+      if (!res.ok) {
+        const dettaglio: { error?: string } = await res.json()
+        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
+      }
+      const data: { text?: string } = await res.json()
+      if (!data.text) throw new Error('Risposta vuota')
+      setConversazione([...nuovi, { role: 'assistant', content: data.text }])
+    } catch (err) {
+      // la conversazione resta com'era: si può riprovare senza perdere le risposte
+      setChatErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  function iniziaTest(): void {
+    setChatErrore('')
+    void inviaMessaggio('Iniziamo il test di livello.', [])
   }
 
   async function invia() {
@@ -267,7 +329,60 @@ function App() {
       </section>
 
       <section className="sezione">
-        <h2>Tutor IA</h2>
+        <h2>Test di livello: {nomeMateria}</h2>
+        <div className="bottoni">
+          <button onClick={iniziaTest} disabled={chatLoading}>
+            {chatLoading ? 'Attendo la risposta...' : 'Inizia test'}
+          </button>
+          {conversazione.length > 0 && (
+            <button onClick={() => setConversazione([])} disabled={chatLoading}>
+              Azzera
+            </button>
+          )}
+        </div>
+
+        {conversazione.length === 0 ? (
+          <p className="nota">
+            L'insegnante farà 8-10 domande, una alla volta, e alla fine ti lascerà un profilo.
+          </p>
+        ) : (
+          <div className="chat">
+            {conversazione.map((messaggio, posizione) => (
+              <p
+                key={posizione}
+                className={messaggio.role === 'user' ? 'chat-utente' : 'chat-ia'}
+              >
+                <strong>{messaggio.role === 'user' ? 'Tu' : 'Insegnante'}:</strong>{' '}
+                {messaggio.content}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            void inviaMessaggio(bozza)
+          }}
+        >
+          <textarea
+            value={bozza}
+            onChange={(e) => setBozza(e.target.value)}
+            placeholder="Scrivi la tua risposta..."
+          ></textarea>
+          <button type="submit" disabled={chatLoading || bozza.trim().length === 0}>
+            Rispondi
+          </button>
+        </form>
+        <p className="errore">{chatErrore}</p>
+      </section>
+
+      <section className="sezione">
+        <h2>Domanda veloce al tutor</h2>
+        <p className="nota">
+          Una domanda singola, senza contesto: per farlo ragionare su un esercizio usa il test di
+          livello o, più avanti, il pulsante "Aiutami".
+        </p>
         <input
           type="password"
           value={password}
