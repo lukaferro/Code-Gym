@@ -30,6 +30,10 @@ const openrouter = {
 
 const providers: Provider[] = [gemini, groq, openrouter];
 
+// I piani gratuiti a volte rispondono lentissimi: oltre 8 secondi passiamo al
+// provider successivo invece di lasciare la chat ferma.
+const TIMEOUT_MS = 8000;
+
 // Controllo della password, copiato in ogni endpoint perché Vercel non
 // include nel pacchetto i file condivisi dentro api/ (vedi PIANO.md).
 function autorizza(req: VercelRequest, res: VercelResponse): boolean {
@@ -55,6 +59,7 @@ async function callProvider(provider: Provider, messages: Message[]): Promise<st
             model: provider.model,
             messages: messages,
         }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
         const detail = await res.text();
