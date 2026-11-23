@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
+import type { Esercizio } from './esercizi'
+import { materie } from './materie'
 import { risultatiTempoScaduto } from './runner'
 import type { RisultatoTest } from './runner'
 import { useTemaScuro } from './tema'
@@ -21,6 +23,19 @@ function adesso(): number {
 const passwordSalvata =
   typeof localStorage === 'undefined' ? '' : (localStorage.getItem('code-gym-password') ?? '')
 
+// Le materie eliminate restano nei dati ma non nel menu.
+const materieVisibili = materie.filter((materia) => !materia.nascosta)
+
+// Ultima materia usata, letta una volta sola come la password.
+const materiaSalvata =
+  typeof localStorage === 'undefined'
+    ? 'javascript'
+    : (localStorage.getItem('code-gym-materia') ?? 'javascript')
+// Se quell'id non esiste più, si riparte da JavaScript.
+const materiaIniziale = materie.some((materia) => materia.id === materiaSalvata)
+  ? materiaSalvata
+  : 'javascript'
+
 function App() {
   const scuro = useTemaScuro()
 
@@ -38,17 +53,31 @@ function App() {
   }
 
   // stato dell'esercizio
+  const [materiaScelta, setMateriaScelta] = useState(materiaIniziale)
   const [indice, setIndice] = useState(0)
-  const esercizio = esercizi[indice]
-  const [codice, setCodice] = useState(esercizio.codiceIniziale)
+  const eserciziMateria = esercizi.filter((singolo) => singolo.materia === materiaScelta)
+  // Con una materia senza esercizi questa è undefined: la pagina mostra un avviso.
+  const esercizio: Esercizio | undefined = eserciziMateria[indice]
+  const [codice, setCodice] = useState(esercizio?.codiceIniziale ?? '')
   const [risultati, setRisultati] = useState<RisultatoTest[]>([])
   const [inCorso, setInCorso] = useState(false)
   const [salvataggio, setSalvataggio] = useState('')
 
+  function cambiaMateria(nuovaMateria: string): void {
+    setMateriaScelta(nuovaMateria)
+    localStorage.setItem('code-gym-materia', nuovaMateria)
+    // L'indice è una posizione nella lista della materia: riparte da zero.
+    setIndice(0)
+    const primo = esercizi.find((singolo) => singolo.materia === nuovaMateria)
+    setCodice(primo?.codiceIniziale ?? '')
+    setRisultati([])
+    setSalvataggio('')
+  }
+
   function cambiaEsercizio(nuovoIndice: number): void {
     setIndice(nuovoIndice)
     // l'editor non si svuota da solo: rimettiamo il codice iniziale del nuovo esercizio
-    setCodice(esercizi[nuovoIndice].codiceIniziale)
+    setCodice(eserciziMateria[nuovoIndice].codiceIniziale)
     setRisultati([])
     setSalvataggio('')
   }
@@ -81,6 +110,8 @@ function App() {
   }
 
   function esegui(deveSalvare: boolean): void {
+    if (!esercizio) return
+    const esercizioCorrente = esercizio
     setInCorso(true)
     setSalvataggio('')
 
@@ -98,7 +129,7 @@ function App() {
 
     // Se il worker non risponde entro il limite, lo terminiamo noi.
     const timer = setTimeout(() => {
-      finisci(risultatiTempoScaduto(esercizio))
+      finisci(risultatiTempoScaduto(esercizioCorrente))
     }, LIMITE_MS)
 
     // funzione unica per chiudere tutto senza dimenticare il timer
@@ -124,10 +155,11 @@ function App() {
       ])
     }
 
-    worker.postMessage({ codice, esercizio })
+    worker.postMessage({ codice, esercizio: esercizioCorrente })
   }
 
   async function salvaTentativo(risultati: RisultatoTest[], durataMs: number): Promise<void> {
+    if (!esercizio) return
     const superati = risultati.filter((r) => r.corretto).length
     const tentativo: Tentativo = {
       esercizioId: esercizio.id,
@@ -152,64 +184,84 @@ function App() {
   }
 
   const superati = risultati.filter((risultato) => risultato.corretto).length
+  const nomeMateria =
+    materie.find((materia) => materia.id === materiaScelta)?.nome ?? materiaScelta
 
   return (
     <>
       <section className="sezione">
-        <select value={indice} onChange={(e) => cambiaEsercizio(Number(e.target.value))}>
-          {esercizi.map((singolo, posizione) => (
-            <option key={singolo.id} value={posizione}>
-              {singolo.titolo} ({singolo.difficolta})
+        <select value={materiaScelta} onChange={(e) => cambiaMateria(e.target.value)}>
+          {materieVisibili.map((singola) => (
+            <option key={singola.id} value={singola.id}>
+              {singola.nome}
             </option>
           ))}
         </select>
 
-        <h2>{esercizio.titolo}</h2>
-        <p>
-          Categoria: {esercizio.categoria} - Difficoltà: {esercizio.difficolta}
-        </p>
-        <p>{esercizio.testo}</p>
-
-        <Editor
-          height="320px"
-          defaultLanguage="javascript"
-          theme={scuro ? 'vs-dark' : 'light'}
-          value={codice}
-          onChange={(nuovo) => setCodice(nuovo ?? '')}
-        />
-
-        <div className="bottoni">
-          <button onClick={() => esegui(false)} disabled={inCorso}>
-            {inCorso ? 'In esecuzione...' : 'Prova'}
-          </button>
-          <button onClick={() => esegui(true)} disabled={inCorso}>
-            {inCorso ? 'In esecuzione...' : 'Consegna'}
-          </button>
-        </div>
-        <p className="nota">
-          Prova esegue i test senza salvare niente. Consegna salva il tentativo nelle statistiche.
-        </p>
-
-        {risultati.length > 0 && (
-          <div>
-            <p>
-              {superati} su {risultati.length} superati
-            </p>
-            <ul>
-              {risultati.map((risultato, posizione) => (
-                <li key={posizione} className={risultato.corretto ? 'esito-ok' : 'esito-no'}>
-                  {risultato.corretto ? 'OK' : 'NO'} - input: {JSON.stringify(risultato.input)} -
-                  atteso: {JSON.stringify(risultato.atteso)} - ottenuto:{' '}
-                  {JSON.stringify(risultato.ottenuto) ?? '—'}
-                  {risultato.errore && <span> - errore: {risultato.errore}</span>}
-                </li>
+        {esercizio ? (
+          <>
+            <select value={indice} onChange={(e) => cambiaEsercizio(Number(e.target.value))}>
+              {eserciziMateria.map((singolo, posizione) => (
+                <option key={singolo.id} value={posizione}>
+                  {singolo.titolo} ({singolo.difficolta})
+                </option>
               ))}
-            </ul>
-          </div>
-        )}
-        {salvataggio && (
-          <p className={salvataggio === 'ok' ? 'esito-ok' : 'esito-no'}>
-            {salvataggio === 'ok' ? 'Tentativo Salvato' : `Salvataggio non riuscito: ${salvataggio}`}
+            </select>
+
+            <h2>{esercizio.titolo}</h2>
+            <p>
+              Categoria: {esercizio.categoria} - Difficoltà: {esercizio.difficolta}
+            </p>
+            <p>{esercizio.testo}</p>
+
+            <Editor
+              height="320px"
+              defaultLanguage="javascript"
+              theme={scuro ? 'vs-dark' : 'light'}
+              value={codice}
+              onChange={(nuovo) => setCodice(nuovo ?? '')}
+            />
+
+            <div className="bottoni">
+              <button onClick={() => esegui(false)} disabled={inCorso}>
+                {inCorso ? 'In esecuzione...' : 'Prova'}
+              </button>
+              <button onClick={() => esegui(true)} disabled={inCorso}>
+                {inCorso ? 'In esecuzione...' : 'Consegna'}
+              </button>
+            </div>
+            <p className="nota">
+              Prova esegue i test senza salvare niente. Consegna salva il tentativo nelle statistiche.
+            </p>
+
+            {risultati.length > 0 && (
+              <div>
+                <p>
+                  {superati} su {risultati.length} superati
+                </p>
+                <ul>
+                  {risultati.map((risultato, posizione) => (
+                    <li key={posizione} className={risultato.corretto ? 'esito-ok' : 'esito-no'}>
+                      {risultato.corretto ? 'OK' : 'NO'} - input:{' '}
+                      {JSON.stringify(risultato.input)} - atteso: {JSON.stringify(risultato.atteso)}{' '}
+                      - ottenuto: {JSON.stringify(risultato.ottenuto) ?? '—'}
+                      {risultato.errore && <span> - errore: {risultato.errore}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {salvataggio && (
+              <p className={salvataggio === 'ok' ? 'esito-ok' : 'esito-no'}>
+                {salvataggio === 'ok'
+                  ? 'Tentativo Salvato'
+                  : `Salvataggio non riuscito: ${salvataggio}`}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="nota">
+            Per {nomeMateria} non ci sono ancora esercizi: arriveranno quelli generati dall'IA.
           </p>
         )}
       </section>
