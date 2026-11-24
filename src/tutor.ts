@@ -1,4 +1,5 @@
 import type { Materia } from './materie.ts'
+import type { Esercizio } from './esercizi.ts'
 
 // Un messaggio della chat: è la stessa forma che /api/ai inoltra ai provider.
 export type Messaggio = {
@@ -32,5 +33,53 @@ export function promptTestLivello(materia: Materia): string {
     'Come chiudi:',
     `- Dopo l'ultima domanda scrivi "PROFILO:" e poi 3-5 righe con punti forti, punti deboli e argomenti da ripassare.`,
     '- Dopo il profilo non fare altre domande e non chiedere altro.',
+  ].join('\n')
+}
+
+// Gli indizi sono tre tipi di aiuto diversi, non tre gradini dello stesso
+// discorso: così ognuno funziona da solo e non serve ricordare i precedenti.
+export type LivelloIndizio = 1 | 2 | 3
+
+const REGOLE_INDIZIO: Record<LivelloIndizio, string> = {
+  1: 'Fai una sola domanda che lo aiuti a capire da dove partire. Non nominare funzioni, metodi o concetti tecnici, non scrivere codice.',
+  2: 'Spiega in una o due frasi il concetto o il metodo che gli serve. Non scrivere codice, nemmeno un esempio di mezza riga.',
+  3: 'Mostra lo schema del codice con i pezzi da riempire come commenti (es. "// qui il ciclo"). Nessuna riga deve funzionare così com\'è: i buchi li riempie lui.',
+}
+
+// Prompt di un indizio: funzione pura, si prova con scripts/prova-prompt.ts.
+export function promptIndizio(
+  materia: Materia,
+  esercizio: Esercizio,
+  codice: string,
+  livello: LivelloIndizio
+): string {
+  // Il codice può essere lungo: si taglia, o paghiamo token inutili.
+  const codiceMostrato = codice.trim()
+    ? ['```', codice.slice(0, 2000), '```'].join('\n')
+    : 'Non ha ancora scritto codice.'
+
+  const esecuzione = materia.eseguibile
+    ? 'Il suo codice viene eseguito davvero dai test: puoi basarti sui risultati.'
+    : 'Il suo codice non viene eseguito: non inventare output o risultati di test.'
+
+  return [
+    `Sei un insegnante paziente di ${materia.nome}; lo studente si prepara ai colloqui tecnici e sta affrontando un esercizio ${esercizio.difficolta}.`,
+    '',
+    'Consegna:',
+    esercizio.testo,
+    '',
+    'Il suo codice in questo momento:',
+    codiceMostrato,
+    '',
+    `Questo è l'indizio di livello ${livello} di 3.`,
+    REGOLE_INDIZIO[livello],
+    '',
+    'Regole valide per tutti i livelli:',
+    '- Non dare mai la soluzione completa né codice che si possa incollare e far funzionare.',
+    '- Non ripetere la consegna e non aprire con frasi tipo "Certo!" o "Ottima domanda".',
+    '- Scrivi in italiano semplice, con frasi corte, al massimo 8 righe.',
+    `- ${esecuzione}`,
+    '',
+    "Rispondi solo con l'indizio.",
   ].join('\n')
 }

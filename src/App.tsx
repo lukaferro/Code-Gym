@@ -9,8 +9,8 @@ import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
 import { inviaTentativo, scaricaTentativi } from './tentativi'
 import type { Tentativo } from './tipi'
-import { promptTestLivello } from './tutor'
-import type { Messaggio } from './tutor'
+import { promptIndizio, promptTestLivello } from './tutor'
+import type { LivelloIndizio, Messaggio } from './tutor'
 
 const LIMITE_MS = 3000
 
@@ -77,6 +77,12 @@ function App() {
   const [backupMessaggio, setBackupMessaggio] = useState('')
   const [backupInCorso, setBackupInCorso] = useState(false)
 
+  // stato degli indizi: un contatore, perché ogni livello è autosufficiente
+  const [livelloIndizi, setLivelloIndizi] = useState(0)
+  const [indizio, setIndizio] = useState('')
+  const [indizioLoading, setIndizioLoading] = useState(false)
+  const [indizioErrore, setIndizioErrore] = useState('')
+
   function cambiaMateria(nuovaMateria: string): void {
     setMateriaScelta(nuovaMateria)
     localStorage.setItem('code-gym-materia', nuovaMateria)
@@ -89,6 +95,10 @@ function App() {
     // Una conversazione su Git non vale per JavaScript.
     setConversazione([])
     setChatErrore('')
+    // L'indizio di un'altra materia non ha senso qui.
+    setLivelloIndizi(0)
+    setIndizio('')
+    setIndizioErrore('')
   }
 
   function cambiaEsercizio(nuovoIndice: number): void {
@@ -97,6 +107,10 @@ function App() {
     setCodice(eserciziMateria[nuovoIndice].codiceIniziale)
     setRisultati([])
     setSalvataggio('')
+    // Il contatore è per esercizio: qui riparte da zero.
+    setLivelloIndizi(0)
+    setIndizio('')
+    setIndizioErrore('')
   }
 
   // base esplicito: dopo "Inizia test" lo stato conversazione non è ancora aggiornato
@@ -146,6 +160,45 @@ function App() {
   function iniziaTest(): void {
     setChatErrore('')
     void inviaMessaggio('Iniziamo il test di livello.', [])
+  }
+
+  // Un indizio per volta: se la chiamata fallisce il livello non sale.
+  async function chiediIndizio(): Promise<void> {
+    if (!esercizio || livelloIndizi >= 3 || indizioLoading) return
+    const livello = (livelloIndizi + 1) as LivelloIndizio
+    setIndizioLoading(true)
+    setIndizioErrore('')
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-password': password,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: promptIndizio(materiaCorrente, esercizio, codice, livello),
+            },
+            { role: 'user', content: "Dammi l'indizio." },
+          ],
+        }),
+      })
+      if (!res.ok) {
+        const dettaglio: { error?: string } = await res.json()
+        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
+      }
+      const data: { text?: string } = await res.json()
+      if (!data.text) throw new Error('Risposta vuota')
+      setIndizio(data.text)
+      setLivelloIndizi(livello)
+    } catch (err) {
+      setIndizioErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setIndizioLoading(false)
+    }
   }
 
   async function esportaTentativi(): Promise<void> {
@@ -236,7 +289,7 @@ function App() {
       setRisultati(nuovi)
       chiudi()
       // La scelta viaggia come parametro: lo stato sarebbe ancora quello vecchio.
-      if (deveSalvare) void salvaTentativo(nuovi, durataMs)
+      if (deveSalvare) void salvaTentativo(nuovi, durataMs, livelloIndizi)
     }
 
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -272,7 +325,11 @@ function App() {
     worker.postMessage({ codice, esercizio: esercizioCorrente })
   }
 
-  async function salvaTentativo(risultati: RisultatoTest[], durataMs: number): Promise<void> {
+  async function salvaTentativo(
+    risultati: RisultatoTest[],
+    durataMs: number,
+    indizi: number
+  ): Promise<void> {
     if (!esercizio) return
     const superati = risultati.filter((r) => r.corretto).length
     const tentativo: Tentativo = {
@@ -282,7 +339,7 @@ function App() {
       superati,
       totale: risultati.length,
       durataMs,
-      indizi: 0,
+      indizi,
       errori: risultati
         .flatMap((r) => (r.errore ? [r.errore] : []))
         .slice(0, 5),
@@ -353,6 +410,22 @@ function App() {
             <p className="nota">
               Prova esegue i test senza salvare niente. Consegna salva il tentativo nelle statistiche.
             </p>
+
+            <div className="bottoni">
+              <button
+                onClick={() => void chiediIndizio()}
+                disabled={indizioLoading || livelloIndizi >= 3}
+              >
+                {indizioLoading
+                  ? 'Attendo l’indizio...'
+                  : livelloIndizi >= 3
+                    ? 'Nessun altro indizio'
+                    : 'Aiutami'}
+              </button>
+              <span className="nota">Indizi usati: {livelloIndizi} su 3</span>
+            </div>
+            {indizio && <p className="indizio">{indizio}</p>}
+            <p className="errore">{indizioErrore}</p>
 
             {risultati.length > 0 && (
               <div>

@@ -83,6 +83,16 @@
   padding: 8px 10px;
 }
 
+/* L'indizio è un blocco a parte: si legge mentre scrivi, senza confonderlo con i test. */
+.indizio {
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 /* L'input file non si può vestire: lo nascondiamo e facciamo da bottone la label. */
 .bottone-file {
   cursor: pointer;
