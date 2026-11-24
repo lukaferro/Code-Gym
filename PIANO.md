@@ -24,10 +24,11 @@ Scrivo io a mano le parti centrali (runner, logica dei tentativi, dashboard). L'
 Un ciclo, non una lista fissa di esercizi:
 
 1. **Capisce il mio livello** con un test iniziale di domande miste, sulla materia scelta.
-2. **Sceglie cosa mi serve adesso**, in base ai miei errori e al profilo.
-3. **Mi propone cose diverse ogni volta**: scrivere una funzione, trovare il bug, prevedere cosa stampa un codice, spiegare con parole mie un concetto, valutare la complessità, fare code review, scenari Git, domande da colloquio anche in inglese.
-4. **Quando sbaglio, mi guida con domande** (indizio vago, poi mirato, poi spiegazione completa) invece di darmi la risposta.
-5. **Ricorda come sto andando** e mi ripropone dopo qualche giorno ciò che ho sbagliato.
+2. **Insegna quando serve**: se non conosco ancora i concetti, mi dà una lezione breve sull'argomento dell'esercizio, con esempi su problemi diversi dal mio, e due domande di verifica.
+3. **Sceglie cosa mi serve adesso**, in base ai miei errori e al profilo.
+4. **Mi propone cose diverse ogni volta**: scrivere una funzione, trovare il bug, prevedere cosa stampa un codice, spiegare con parole mie un concetto, valutare la complessità, fare code review, scenari Git, domande da colloquio anche in inglese.
+5. **Quando sbaglio, mi guida con domande** (indizio vago, poi mirato, poi schema con i buchi) invece di darmi la soluzione completa.
+6. **Ricorda come sto andando** e mi ripropone dopo qualche giorno ciò che ho sbagliato.
 
 Limite onesto: con i modelli gratuiti la qualità varia. Per questo servono un prompt di sistema con regole scritte, il profilo passato a ogni chiamata e la validazione dei contenuti generati.
 
@@ -63,7 +64,8 @@ Il rischio vero è costruire l'app senza usarla. La versione 1 è completa quand
 2. test di livello;
 3. esercizi con test, con **Prova** e **Consegna**;
 4. pulsante "Aiutami" con indizi a livelli;
-5. salvataggio dei tentativi con backup.
+5. salvataggio dei tentativi con backup;
+6. **lezione contestuale**: un pulsante "Teoria" che spiega l'argomento dell'esercizio quando i concetti non li conosco ancora. Nata dopo le prime prove: senza la teoria l'indizio non basta.
 
 Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi prima di mettere mano al codice dell'app. Annoto cosa manca e cosa non serve, e solo dopo decido cosa aggiungere.
 
@@ -73,6 +75,8 @@ Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi 
 - Backend: funzioni serverless di Vercel nella cartella `api/`.
 - IA gratuita con fallback: Gemini, poi Groq, poi OpenRouter (modelli `:free`), con un limite di tempo (circa 8 secondi) per ogni provider.
 - Il piano Pro di Gemini non dà quota API: lo uso come secondo insegnante manuale, con un bottone "Chiedi a Gemini Pro" che copia il prompt completo da incollare nell'app Gemini.
+- Niente tracciamento manuale delle ricerche fatte fuori dall'app: un diario da compilare si abbandona. I segnali sono quelli che il server salva già con ogni consegna: `indizi` e `lezioni`.
+- Link ai docs in inglese (MDN `en-US`): la versione italiana è tradotta a metà e leggere i docs in inglese allena anche al colloquio.
 - Accesso all'API protetto da una password inviata nell'header `x-app-password`.
 - Database: Turso (SQLite ospitato), scelto invece di Supabase perché i progetti gratuiti Supabase si mettono in pausa dopo una settimana di inattività e auth/storage non servono.
 - Esecuzione del codice: JavaScript nel browser; Python con Pyodide più avanti. C# e Java: per ora l'IA valuta il codice senza eseguirlo (segnalato nella pagina); poi, con un servizio come Judge0 tramite `api/run.ts` (piano gratuito, oppure installato sul Raspberry).
@@ -92,6 +96,7 @@ Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi 
 | Schermata di gestione materie | `src/GestioneMaterie.tsx` (da creare) |
 | Salvataggio dei tentativi e backup | `src/tentativi.ts` (invio all'API) |
 | Prompt e logica dell'insegnante | `src/tutor.ts` |
+| Link ai docs MDN per categoria | `src/docs.ts` |
 | API con fallback tra provider | `api/ai.ts` |
 | Esecuzione remota di codice (più avanti) | `api/run.ts` |
 | Script di prova locali | `prova.mjs`, `prova-handler.ts`, `prova-online.mjs` |
@@ -115,10 +120,11 @@ Prossimi passi, in ordine:
 3. [x] Pulsanti **Prova** e **Consegna**; salvataggio delle consegne su Turso
 4. [x] Timeout (circa 8 secondi) per ogni provider in `api/ai.ts`
 5. [x] Test di livello collegato alla chat, con la conversazione che si accumula
-6. [ ] **In corso:** backup Esporta/Importa dei tentativi in JSON
-7. [ ] Pulsante "Aiutami" con indizi a livelli, e "Chiedi a Gemini Pro"
-8. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
-9. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
+6. [x] Backup Esporta/Importa dei tentativi in JSON
+7. [x] "Aiutami" con indizi a tre livelli (domanda, concetto, schema con i buchi)
+8. [ ] **In corso:** lezione contestuale ("Teoria"), conteggio `lezioni`, link ai docs MDN
+9. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
+10. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
 
 ## Fasi
 
@@ -126,7 +132,8 @@ Prossimi passi, in ordine:
 
 - **2a. Materie gestibili dall'app.** Menu di scelta, poi `materieStore.ts`, poi la schermata per aggiungere, modificare ed eliminare, e il suggerimento degli argomenti da parte dell'IA.
 - **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`) e a ogni invio mando tutta la lista a `/api/ai`. Il profilo per ora resta nella chat: verrà salvato con il profilo della Fase 3.
-- **2c. Tutor sugli errori.** Pulsante "Aiutami" con tre livelli: indizio vago, indizio mirato, spiegazione completa. L'IA risponde in JSON con spiegazione e tag dell'errore (`async`, `array`, `complessità`, ...). Il prompt vieta la soluzione completa prima del livello 3. Opzione "Chiedi a Gemini Pro".
+- **2c. Tutor sugli errori.** Pulsante "Aiutami" con tre livelli, e ogni livello è un **tipo di aiuto diverso**: (1) una domanda che fa ragionare, senza nominare funzioni; (2) il concetto o il metodo giusto, senza codice; (3) lo schema del codice con i pezzi da riempire come commenti. Il prompt vieta la soluzione completa a ogni livello. Gli indizi usati finiscono nel tentativo (`indizi`). Opzione "Chiedi a Gemini Pro" ancora da fare.
+- **2c-bis. Lezione contestuale.** Pulsante "Teoria" sull'esercizio: una lezione di massimo 12 righe sull'argomento, con un esempio su un **problema diverso** (così non è la soluzione travestita), due errori comuni e due domande di verifica. Il testo riceve materia, titolo, categoria e difficoltà, ma **non il testo dell'esercizio**. Il contatore `lezioni` finisce nel tentativo. Insieme c'è un link ai docs MDN generato dalla categoria, senza IA.
 - **2d. Esercizi generati e tipi vari.** "Genera un esercizio su questo argomento", con validazione: l'IA fornisce anche una soluzione di riferimento, il runner la esegue contro i test e l'esercizio si scarta se la fallisce. Tipi: scrivere una funzione, trovare il bug, prevedere l'output, spiegare un concetto, complessità, code review.
 - **2e. Prompt di sistema dell'insegnante** in `src/tutor.ts`, con regole di tono, di sequenza degli aiuti e di formato delle risposte.
 - **2f. Altri linguaggi.** Python con Pyodide e il runner esistente; C# e Java valutati dall'IA senza esecuzione, poi con Judge0.
@@ -157,7 +164,7 @@ Pillole (massimo 1-2 al giorno), chat libera con le mie statistiche, comandi `/o
 
 ## Modello dati minimo
 
-`Materia` (id, nome, argomenti, eseguibile, nascosta), `Esercizio` (con `materia`), `Tentativo` (materia, esercizio, esito, tempo, indizi, tag errore, data; salvato solo con Consegna), `StatArgomento`, `ProfiloStudente` (uno per materia), `Obiettivo`, `PianoSettimana`.
+`Materia` (id, nome, argomenti, eseguibile, nascosta), `Esercizio` (con `materia`), `Tentativo` (materia, esercizio, esito, tempo, `indizi`, `lezioni`, tag errore, data; salvato solo con Consegna), `StatArgomento`, `ProfiloStudente` (uno per materia), `Obiettivo`, `PianoSettimana`.
 
 ## Attenzioni
 
@@ -167,5 +174,6 @@ Pillole (massimo 1-2 al giorno), chat libera con le mie statistiche, comandi `/o
 - Le chiavi non vanno mai nel frontend né in variabili che iniziano con `VITE_`.
 - `npm audit fix --force` non si usa: può installare versioni incompatibili.
 - Gli esercizi generati vanno sempre validati prima di essere mostrati.
+- Le lezioni generate possono sbagliare, e su un testo lungo ci si fida più che su un indizio: l'esempio deve stare su un problema diverso dall'esercizio, altrimenti è la soluzione travestita.
 - `localStorage` si perde se cancello i dati del browser: per questo c'è il backup Esporta/Importa e, più avanti, il database.
 - Il codice di C# e Java valutato dall'IA non è eseguito davvero: può sbagliare.

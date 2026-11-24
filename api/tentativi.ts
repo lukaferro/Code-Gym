@@ -13,6 +13,7 @@ type Tentativo = {
     totale: number;
     durataMs: number;
     indizi: number;
+    lezioni: number;
     errori: string[];
     data: string;
 };
@@ -53,8 +54,8 @@ async function creaClient(): Promise<Client> {
 async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
     const risultato = await db.execute({
         sql: `INSERT INTO tentativi
-              (esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (esercizio_id, materia, esito, superati, totale, durata_ms, indizi, lezioni, errori, data)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
             tentativo.esercizioId,
             tentativo.materia,
@@ -63,6 +64,7 @@ async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number>
             tentativo.totale,
             tentativo.durataMs,
             tentativo.indizi,
+            tentativo.lezioni,
             JSON.stringify(tentativo.errori),
             tentativo.data,
         ],
@@ -99,7 +101,9 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
     const totale = intero(dati.totale, 0, 1000);
     const durataMs = intero(dati.durataMs, 0, MAX_DURATA_MS);
     const indizi = intero(dati.indizi, 0, 100);
-    if (superati === null || totale === null || durataMs === null || indizi === null) return null;
+    const lezioni = intero(dati.lezioni, 0, 100);
+    if (superati === null || totale === null || durataMs === null || indizi === null || lezioni === null)
+        return null;
     if (superati > totale) return null;
 
     if (!Array.isArray(dati.errori) || dati.errori.length > MAX_ERRORI) return null;
@@ -117,6 +121,7 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
         totale,
         durataMs,
         indizi,
+        lezioni,
         errori,
         // la data la decide il server: dal browser non è affidabile
         data: new Date().toISOString(),
@@ -126,7 +131,7 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
 // Legge tutti i tentativi, dal più vecchio al più recente: serve al backup.
 async function leggiTentativi(db: Client, limite = 5000): Promise<Tentativo[]> {
     const risultato = await db.execute({
-        sql: `SELECT id, esercizio_id, materia, esito, superati, totale, durata_ms, indizi, errori, data
+        sql: `SELECT id, esercizio_id, materia, esito, superati, totale, durata_ms, indizi, lezioni, errori, data
               FROM tentativi ORDER BY id LIMIT ?`,
         args: [limite],
     });
@@ -140,6 +145,7 @@ async function leggiTentativi(db: Client, limite = 5000): Promise<Tentativo[]> {
         totale: Number(riga.totale),
         durataMs: Number(riga.durata_ms),
         indizi: Number(riga.indizi),
+        lezioni: Number(riga.lezioni),
         errori: JSON.parse(String(riga.errori)) as string[],
         data: String(riga.data),
     }));

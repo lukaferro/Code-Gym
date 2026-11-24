@@ -93,6 +93,34 @@
   white-space: pre-wrap;
 }
 
+/* Teoria e indizio condividono lo stesso riquadro: non si contendono l'attenzione. */
+.aiuto {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aiuto details {
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.aiuto summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.aiuto details p {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
+.link-docs {
+  white-space: nowrap;
+}
+
 /* L'input file non si può vestire: lo nascondiamo e facciamo da bottone la label. */
 .bottone-file {
   cursor: pointer;

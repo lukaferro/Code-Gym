@@ -9,8 +9,9 @@ import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
 import { inviaTentativo, scaricaTentativi } from './tentativi'
 import type { Tentativo } from './tipi'
-import { promptIndizio, promptTestLivello } from './tutor'
+import { promptIndizio, promptLezione, promptTestLivello } from './tutor'
 import type { LivelloIndizio, Messaggio } from './tutor'
+import { linkMdn } from './docs'
 
 const LIMITE_MS = 3000
 
@@ -83,6 +84,13 @@ function App() {
   const [indizioLoading, setIndizioLoading] = useState(false)
   const [indizioErrore, setIndizioErrore] = useState('')
 
+  // stato della lezione: il blocco resta a schermo ma si può chiudere
+  const [lezione, setLezione] = useState('')
+  const [lezioneAperta, setLezioneAperta] = useState(true)
+  const [lezioneLoading, setLezioneLoading] = useState(false)
+  const [lezioneErrore, setLezioneErrore] = useState('')
+  const [lezioni, setLezioni] = useState(0)
+
   function cambiaMateria(nuovaMateria: string): void {
     setMateriaScelta(nuovaMateria)
     localStorage.setItem('code-gym-materia', nuovaMateria)
@@ -99,6 +107,9 @@ function App() {
     setLivelloIndizi(0)
     setIndizio('')
     setIndizioErrore('')
+    setLezione('')
+    setLezioneErrore('')
+    setLezioni(0)
   }
 
   function cambiaEsercizio(nuovoIndice: number): void {
@@ -111,6 +122,9 @@ function App() {
     setLivelloIndizi(0)
     setIndizio('')
     setIndizioErrore('')
+    setLezione('')
+    setLezioneErrore('')
+    setLezioni(0)
   }
 
   // base esplicito: dopo "Inizia test" lo stato conversazione non è ancora aggiornato
@@ -198,6 +212,42 @@ function App() {
       setIndizioErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
     } finally {
       setIndizioLoading(false)
+    }
+  }
+
+  // La lezione non ha livelli: si chiede finché serve e ognuna conta.
+  async function chiediLezione(): Promise<void> {
+    if (!esercizio || lezioneLoading) return
+    setLezioneLoading(true)
+    setLezioneErrore('')
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-password': password,
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: promptLezione(materiaCorrente, esercizio) },
+            { role: 'user', content: 'Spiegami la teoria.' },
+          ],
+        }),
+      })
+      if (!res.ok) {
+        const dettaglio: { error?: string } = await res.json()
+        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
+      }
+      const data: { text?: string } = await res.json()
+      if (!data.text) throw new Error('Risposta vuota')
+      setLezione(data.text)
+      setLezioneAperta(true)
+      setLezioni(lezioni + 1)
+    } catch (err) {
+      setLezioneErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setLezioneLoading(false)
     }
   }
 
@@ -289,7 +339,7 @@ function App() {
       setRisultati(nuovi)
       chiudi()
       // La scelta viaggia come parametro: lo stato sarebbe ancora quello vecchio.
-      if (deveSalvare) void salvaTentativo(nuovi, durataMs, livelloIndizi)
+      if (deveSalvare) void salvaTentativo(nuovi, durataMs, livelloIndizi, lezioni)
     }
 
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -328,7 +378,8 @@ function App() {
   async function salvaTentativo(
     risultati: RisultatoTest[],
     durataMs: number,
-    indizi: number
+    indizi: number,
+    lezioni: number
   ): Promise<void> {
     if (!esercizio) return
     const superati = risultati.filter((r) => r.corretto).length
@@ -340,6 +391,7 @@ function App() {
       totale: risultati.length,
       durataMs,
       indizi,
+      lezioni,
       errori: risultati
         .flatMap((r) => (r.errore ? [r.errore] : []))
         .slice(0, 5),
@@ -387,7 +439,15 @@ function App() {
 
             <h2>{esercizio.titolo}</h2>
             <p>
-              Categoria: {esercizio.categoria} - Difficoltà: {esercizio.difficolta}
+              Categoria: {esercizio.categoria} - Difficoltà: {esercizio.difficolta} -{' '}
+              <a
+                className="link-docs"
+                href={linkMdn(esercizio.categoria)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Docs MDN (inglese)
+              </a>
             </p>
             <p>{esercizio.testo}</p>
 
@@ -412,6 +472,9 @@ function App() {
             </p>
 
             <div className="bottoni">
+              <button onClick={() => void chiediLezione()} disabled={lezioneLoading}>
+                {lezioneLoading ? 'Attendo la lezione...' : 'Teoria'}
+              </button>
               <button
                 onClick={() => void chiediIndizio()}
                 disabled={indizioLoading || livelloIndizi >= 3}
@@ -422,9 +485,26 @@ function App() {
                     ? 'Nessun altro indizio'
                     : 'Aiutami'}
               </button>
-              <span className="nota">Indizi usati: {livelloIndizi} su 3</span>
+              <span className="nota">
+                Indizi: {livelloIndizi} su 3 · Lezioni: {lezioni}
+              </span>
             </div>
-            {indizio && <p className="indizio">{indizio}</p>}
+            {(lezione || indizio) && (
+              <div className="aiuto">
+                {lezione && (
+                  // open controllato: l'attributo nudo si riapre a ogni ridisegno
+                  <details
+                    open={lezioneAperta}
+                    onToggle={(evento) => setLezioneAperta(evento.currentTarget.open)}
+                  >
+                    <summary>Teoria</summary>
+                    <p>{lezione}</p>
+                  </details>
+                )}
+                {indizio && <p className="indizio">{indizio}</p>}
+              </div>
+            )}
+            <p className="errore">{lezioneErrore}</p>
             <p className="errore">{indizioErrore}</p>
 
             {risultati.length > 0 && (

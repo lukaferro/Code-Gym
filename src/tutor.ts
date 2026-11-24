@@ -83,3 +83,26 @@ export function promptIndizio(
     "Rispondi solo con l'indizio.",
   ].join('\n')
 }
+
+// Lezione contestuale: spiega l'argomento dell'esercizio senza risolverlo.
+// Non riceve il testo dell'esercizio apposta: così non può copiarlo.
+export function promptLezione(materia: Materia, esercizio: Esercizio): string {
+  return [
+    `Sei un insegnante paziente di ${materia.nome}; lo studente si prepara ai colloqui tecnici e sta per affrontare un esercizio ${esercizio.difficolta} dal titolo "${esercizio.titolo}", sulla categoria "${esercizio.categoria}".`,
+    'Deve prima capire la teoria: dagli una lezione breve, in italiano semplice e con frasi corte, al massimo 12 righe.',
+    '',
+    'Struttura:',
+    "1. L'idea in tre frasi: a cosa serve, quando si usa, cosa fa.",
+    "2. Un esempio su un problema DIVERSO da quello dell'esercizio: nomi diversi, dati diversi.",
+    '3. Due errori comuni, uno per riga.',
+    '4. Due domande di verifica per lui, da rispondere a voce. Non risolverle.',
+    '',
+    'Regole:',
+    "- Non menzionare il testo dell'esercizio e non risolverlo, nemmeno in parte.",
+    "- Non scrivere funzioni complete: nell'esempio puoi mostrare solo singole istruzioni.",
+    '- Codice solo per l\'esempio generico, niente altro.',
+    '- I nomi di metodi e proprietà restano in inglese, come nel linguaggio.',
+    '',
+    'Rispondi solo con la lezione.',
+  ].join('\n')
+}

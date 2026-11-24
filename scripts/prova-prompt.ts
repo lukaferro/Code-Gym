@@ -2,7 +2,8 @@
 // Uso: node scripts/prova-prompt.ts <id materia>
 import { materie } from '../src/materie.ts'
 import { esercizi } from '../src/esercizi.ts'
-import { promptIndizio, promptTestLivello } from '../src/tutor.ts'
+import { promptIndizio, promptLezione, promptTestLivello } from '../src/tutor.ts'
+import { linkMdn } from '../src/docs.ts'
 
 const scelta = process.argv[2]
 const materia = materie.find((singola) => singola.id === scelta)
@@ -21,6 +22,10 @@ if (!materia) {
     console.log('\nNessun esercizio per questa materia: niente indizi da provare.')
   } else {
     const codice = `function ${esercizio.nomeFunzione}(input) {\n  // il mio tentativo\n}`
+    console.log(`\n=== prompt lezione (${esercizio.id}) ===`)
+    console.log(promptLezione(materia, esercizio))
+    console.log(`\nlink docs: ${linkMdn(esercizio.categoria)}`)
+
     for (const livello of [1, 2, 3] as const) {
       const indizio = promptIndizio(materia, esercizio, codice, livello)
       console.log(`\n=== indizio livello ${livello} (${esercizio.id}) ===`)

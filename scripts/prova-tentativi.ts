@@ -38,6 +38,7 @@ const valido = {
   totale: 3,
   durataMs: 45000,
   indizi: 0,
+  lezioni: 0,
   errori: [],
 };
 
@@ -89,6 +90,15 @@ await prova(
   },
   400
 );
+await prova(
+  'lezioni negative',
+  {
+    method: 'POST',
+    headers: { 'x-app-password': 'prova' },
+    body: { ...valido, lezioni: -1 },
+  },
+  400
+);
 await prova('tentativo valido', { method: 'POST', headers: { 'x-app-password': 'prova' }, body: valido }, 201);
 await prova(
   'tentativo fallito valido',
@@ -100,6 +110,7 @@ await prova(
       esito: false,
       superati: 1,
       indizi: 2,
+      lezioni: 1,
       errori: ['Tempo scaduto: possibile ciclo infinito'],
     },
   },
@@ -110,7 +121,7 @@ const lettura = await creaClient();
 const tentativi = await leggiTentativi(lettura);
 console.log('\nRighe salvate:', tentativi.length);
 for (const t of tentativi) {
-  console.log(' ', t.id, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, t.errori);
+  console.log(' ', t.id, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, 'lezioni', t.lezioni, t.errori);
 }
 lettura.close();
 
