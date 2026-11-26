@@ -1,5 +1,6 @@
 import type { Materia } from './materie.ts'
 import type { Esercizio } from './esercizi.ts'
+import type { RisultatoTest } from './runner.ts'
 
 // Un messaggio della chat: è la stessa forma che /api/ai inoltra ai provider.
 export type Messaggio = {
@@ -36,6 +37,67 @@ export function promptTestLivello(materia: Materia): string {
   ].join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// Contesto comune a tutti gli aiuti sull'esercizio: consegna, codice, risultati.
+// Il resto del prompt cambia, questa parte no. Così ogni aiuto parla del SUO
+// codice e non di un esercizio generico.
+// ---------------------------------------------------------------------------
+
+function mostraValore(valore: unknown): string {
+  try {
+    const json = JSON.stringify(valore)
+    return (json === undefined ? String(valore) : json).slice(0, 120)
+  } catch {
+    return String(valore).slice(0, 120)
+  }
+}
+
+// Riassunto compatto dei test: quello che l'IA deve leggere per capire dove sei.
+export function riassuntoRisultati(risultati: RisultatoTest[]): string {
+  if (risultati.length === 0) return 'Non ha ancora eseguito i test.'
+
+  return risultati
+    .slice(0, 8)
+    .map((risultato, posizione) => {
+      const input = risultato.input.map(mostraValore).join(', ')
+      const esito = risultato.corretto ? 'OK' : 'SBAGLIATO'
+      const errore = risultato.errore ? ` - errore: ${risultato.errore.slice(0, 160)}` : ''
+      return `Test ${posizione + 1}: (${input}) -> atteso ${mostraValore(risultato.atteso)}, ottenuto ${mostraValore(risultato.ottenuto)} (${esito})${errore}`
+    })
+    .join('\n')
+}
+
+function contestoEsercizio(
+  materia: Materia,
+  esercizio: Esercizio,
+  codice: string,
+  risultati: RisultatoTest[]
+): string[] {
+  // Il codice può essere lungo: si taglia, o paghiamo token inutili.
+  const codiceMostrato = codice.trim()
+    ? ['```', codice.slice(0, 2000), '```'].join('\n')
+    : 'Non ha ancora scritto codice.'
+
+  const esecuzione = materia.eseguibile
+    ? 'Il suo codice viene eseguito davvero dai test: i risultati qui sopra sono veri.'
+    : 'Il suo codice non viene eseguito dal sito: valuta tu, senza inventare risultati.'
+
+  return [
+    `Sei un insegnante paziente di ${materia.nome}; lo studente si prepara ai colloqui tecnici e sta affrontando un esercizio ${esercizio.difficolta}.`,
+    '',
+    'Consegna:',
+    esercizio.testo,
+    '',
+    'Il suo codice in questo momento:',
+    codiceMostrato,
+    '',
+    "Risultati dell'ultima esecuzione dei test:",
+    riassuntoRisultati(risultati),
+    '',
+    `- ${esecuzione}`,
+  ]
+}
+
 // Gli indizi sono tre tipi di aiuto diversi, non tre gradini dello stesso
 // discorso: così ognuno funziona da solo e non serve ricordare i precedenti.
 export type LivelloIndizio = 1 | 2 | 3
@@ -51,45 +113,37 @@ export function promptIndizio(
   materia: Materia,
   esercizio: Esercizio,
   codice: string,
+  risultati: RisultatoTest[],
   livello: LivelloIndizio
 ): string {
-  // Il codice può essere lungo: si taglia, o paghiamo token inutili.
-  const codiceMostrato = codice.trim()
-    ? ['```', codice.slice(0, 2000), '```'].join('\n')
-    : 'Non ha ancora scritto codice.'
-
-  const esecuzione = materia.eseguibile
-    ? 'Il suo codice viene eseguito davvero dai test: puoi basarti sui risultati.'
-    : 'Il suo codice non viene eseguito: non inventare output o risultati di test.'
-
   return [
-    `Sei un insegnante paziente di ${materia.nome}; lo studente si prepara ai colloqui tecnici e sta affrontando un esercizio ${esercizio.difficolta}.`,
-    '',
-    'Consegna:',
-    esercizio.testo,
-    '',
-    'Il suo codice in questo momento:',
-    codiceMostrato,
+    ...contestoEsercizio(materia, esercizio, codice, risultati),
     '',
     `Questo è l'indizio di livello ${livello} di 3.`,
     REGOLE_INDIZIO[livello],
     '',
     'Regole valide per tutti i livelli:',
+    "- Se i test danno un errore o un risultato sbagliato, usa QUELLO: l'indizio deve parlare del suo codice, non di un esercizio in astratto.",
     '- Non dare mai la soluzione completa né codice che si possa incollare e far funzionare.',
     '- Non ripetere la consegna e non aprire con frasi tipo "Certo!" o "Ottima domanda".',
     '- Scrivi in italiano semplice, con frasi corte, al massimo 8 righe.',
-    `- ${esecuzione}`,
     '',
     "Rispondi solo con l'indizio.",
   ].join('\n')
 }
 
 // Lezione contestuale: spiega l'argomento dell'esercizio senza risolverlo.
-// Non riceve il testo dell'esercizio apposta: così non può copiarlo.
-export function promptLezione(materia: Materia, esercizio: Esercizio): string {
+export function promptLezione(
+  materia: Materia,
+  esercizio: Esercizio,
+  codice: string,
+  risultati: RisultatoTest[]
+): string {
   return [
-    `Sei un insegnante paziente di ${materia.nome}; lo studente si prepara ai colloqui tecnici e sta per affrontare un esercizio ${esercizio.difficolta} dal titolo "${esercizio.titolo}", sulla categoria "${esercizio.categoria}".`,
-    'Deve prima capire la teoria: dagli una lezione breve, in italiano semplice e con frasi corte, al massimo 12 righe.',
+    ...contestoEsercizio(materia, esercizio, codice, risultati),
+    '',
+    `L'argomento da spiegare è la categoria "${esercizio.categoria}".`,
+    'Dagli una lezione breve, in italiano semplice e con frasi corte, al massimo 12 righe.',
     '',
     'Struttura:',
     "1. L'idea in tre frasi: a cosa serve, quando si usa, cosa fa.",
@@ -98,11 +152,60 @@ export function promptLezione(materia: Materia, esercizio: Esercizio): string {
     '4. Due domande di verifica per lui, da rispondere a voce. Non risolverle.',
     '',
     'Regole:',
-    "- Non menzionare il testo dell'esercizio e non risolverlo, nemmeno in parte.",
+    "- Non risolvere l'esercizio, nemmeno in parte.",
     "- Non scrivere funzioni complete: nell'esempio puoi mostrare solo singole istruzioni.",
     '- Codice solo per l\'esempio generico, niente altro.',
     '- I nomi di metodi e proprietà restano in inglese, come nel linguaggio.',
     '',
     'Rispondi solo con la lezione.',
+  ].join('\n')
+}
+
+// "Cosa non va?": guarda il SUO codice e i risultati veri, e spiega l'errore.
+export function promptCosaNonVa(
+  materia: Materia,
+  esercizio: Esercizio,
+  codice: string,
+  risultati: RisultatoTest[]
+): string {
+  return [
+    ...contestoEsercizio(materia, esercizio, codice, risultati),
+    '',
+    'Spiega cosa non funziona nel suo codice, in massimo 8 righe:',
+    '- parti dal test che fallisce e dal valore che ha ottenuto;',
+    '- indica il punto preciso (la riga, la condizione, il passaggio) e perché sbaglia;',
+    '- se il codice è vuoto o quasi, digli da dove partire;',
+    '- non riscrivere la soluzione e non incollare il codice corretto: fagli capire cosa cambiare.',
+    '',
+    'Italiano semplice, frasi corte.',
+    'Rispondi solo con la spiegazione.',
+  ].join('\n')
+}
+
+// Chat contestuale sull'esercizio: la domanda la scrive lo studente.
+export function promptTutorEsercizio(
+  materia: Materia,
+  esercizio: Esercizio,
+  codice: string,
+  risultati: RisultatoTest[]
+): string {
+  return [
+    ...contestoEsercizio(materia, esercizio, codice, risultati),
+    '',
+    'Rispondi alle sue domande su questo esercizio, una cosa alla volta, in massimo 8 righe.',
+    'Non dare mai la soluzione completa: spiega, fai esempi su casi diversi, fai domande.',
+    "Se la domanda è fuori tema, riportalo all'esercizio in una frase.",
+    '',
+    'Italiano semplice.',
+  ].join('\n')
+}
+
+// Chat senza esercizio (materie che non hanno ancora esercizi).
+export function promptTutorBase(materia: Materia): string {
+  return [
+    `Sei un insegnante paziente di ${materia.nome} per chi prepara colloqui tecnici.`,
+    `Argomenti: ${materia.argomenti.join(', ')}.`,
+    'Rispondi in italiano semplice, al massimo 8 righe, una cosa alla volta, con un esempio quando serve.',
+    'Non dare mai soluzioni complete di esercizi: spiega il concetto e fai ragionare.',
   ].join('\n')
 }

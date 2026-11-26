@@ -8,6 +8,7 @@ type Tentativo = {
     id?: number;
     esercizioId: string;
     materia: string;
+    tipo: 'prova' | 'consegna';
     esito: boolean;
     superati: number;
     totale: number;
@@ -54,11 +55,12 @@ async function creaClient(): Promise<Client> {
 async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
     const risultato = await db.execute({
         sql: `INSERT INTO tentativi
-              (esercizio_id, materia, esito, superati, totale, durata_ms, indizi, lezioni, errori, data)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (esercizio_id, materia, tipo, esito, superati, totale, durata_ms, indizi, lezioni, errori, data)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
             tentativo.esercizioId,
             tentativo.materia,
+            tentativo.tipo,
             tentativo.esito ? 1 : 0,
             tentativo.superati,
             tentativo.totale,
@@ -97,6 +99,10 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
 
     if (typeof dati.esito !== 'boolean') return null;
 
+    // I file di backup vecchi non hanno `tipo`: valgono come consegne.
+    const tipo = dati.tipo === undefined ? 'consegna' : dati.tipo;
+    if (tipo !== 'prova' && tipo !== 'consegna') return null;
+
     const superati = intero(dati.superati, 0, 1000);
     const totale = intero(dati.totale, 0, 1000);
     const durataMs = intero(dati.durataMs, 0, MAX_DURATA_MS);
@@ -116,6 +122,7 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
     return {
         esercizioId,
         materia,
+        tipo,
         esito: dati.esito,
         superati,
         totale,
@@ -131,7 +138,7 @@ export function validaTentativo(corpo: unknown): Tentativo | null {
 // Legge tutti i tentativi, dal più vecchio al più recente: serve al backup.
 async function leggiTentativi(db: Client, limite = 5000): Promise<Tentativo[]> {
     const risultato = await db.execute({
-        sql: `SELECT id, esercizio_id, materia, esito, superati, totale, durata_ms, indizi, lezioni, errori, data
+        sql: `SELECT id, esercizio_id, materia, tipo, esito, superati, totale, durata_ms, indizi, lezioni, errori, data
               FROM tentativi ORDER BY id LIMIT ?`,
         args: [limite],
     });
@@ -140,6 +147,7 @@ async function leggiTentativi(db: Client, limite = 5000): Promise<Tentativo[]> {
         id: Number(riga.id),
         esercizioId: String(riga.esercizio_id),
         materia: String(riga.materia),
+        tipo: String(riga.tipo) === 'prova' ? 'prova' : 'consegna',
         esito: Number(riga.esito) === 1,
         superati: Number(riga.superati),
         totale: Number(riga.totale),

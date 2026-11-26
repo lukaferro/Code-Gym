@@ -99,6 +99,15 @@ await prova(
   },
   400
 );
+await prova(
+  'tipo non valido',
+  {
+    method: 'POST',
+    headers: { 'x-app-password': 'prova' },
+    body: { ...valido, tipo: 'esame' },
+  },
+  400
+);
 await prova('tentativo valido', { method: 'POST', headers: { 'x-app-password': 'prova' }, body: valido }, 201);
 await prova(
   'tentativo fallito valido',
@@ -116,17 +125,26 @@ await prova(
   },
   201
 );
+await prova(
+  'prova salvata',
+  {
+    method: 'POST',
+    headers: { 'x-app-password': 'prova' },
+    body: { ...valido, tipo: 'prova', esito: false, superati: 2 },
+  },
+  201
+);
 
 const lettura = await creaClient();
 const tentativi = await leggiTentativi(lettura);
 console.log('\nRighe salvate:', tentativi.length);
 for (const t of tentativi) {
-  console.log(' ', t.id, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, 'lezioni', t.lezioni, t.errori);
+  console.log(' ', t.id, t.tipo, t.materia, t.esercizioId, 'esito', t.esito, `${t.superati}/${t.totale}`, `${t.durataMs}ms`, 'indizi', t.indizi, 'lezioni', t.lezioni, t.errori);
 }
 lettura.close();
 
 // Il backup passa da qui: GET protetta che restituisce tutto.
 const esportazione = await prova('GET con password', { method: 'GET', headers: { 'x-app-password': 'prova' } }, 200);
 const esportati = (esportazione.corpo as { tentativi?: unknown[] }).tentativi ?? [];
-console.log(esportati.length === 2 ? 'OK      GET restituisce 2 tentativi' : `FALLITO GET restituisce ${esportati.length} tentativi`);
+console.log(esportati.length === 3 ? 'OK      GET restituisce 3 tentativi' : `FALLITO GET restituisce ${esportati.length} tentativi`);
 

@@ -2,8 +2,15 @@
 // Uso: node scripts/prova-prompt.ts <id materia>
 import { materie } from '../src/materie.ts'
 import { esercizi } from '../src/esercizi.ts'
-import { promptIndizio, promptLezione, promptTestLivello } from '../src/tutor.ts'
+import {
+  promptCosaNonVa,
+  promptIndizio,
+  promptLezione,
+  promptTestLivello,
+  promptTutorEsercizio,
+} from '../src/tutor.ts'
 import { linkMdn } from '../src/docs.ts'
+import type { RisultatoTest } from '../src/runner.ts'
 
 const scelta = process.argv[2]
 const materia = materie.find((singola) => singola.id === scelta)
@@ -22,12 +29,27 @@ if (!materia) {
     console.log('\nNessun esercizio per questa materia: niente indizi da provare.')
   } else {
     const codice = `function ${esercizio.nomeFunzione}(input) {\n  // il mio tentativo\n}`
+    // Risultati finti: servono a vedere che i prompt parlano del codice vero.
+    const risultati: RisultatoTest[] = esercizio.test.slice(0, 2).map((test, posizione) => ({
+      input: test.input,
+      atteso: test.atteso,
+      ottenuto: posizione === 0 ? test.atteso : null,
+      corretto: posizione === 0,
+      errore: posizione === 0 ? undefined : 'TypeError: text.split is not a function',
+    }))
+
     console.log(`\n=== prompt lezione (${esercizio.id}) ===`)
-    console.log(promptLezione(materia, esercizio))
+    console.log(promptLezione(materia, esercizio, codice, risultati))
     console.log(`\nlink docs: ${linkMdn(esercizio.categoria)}`)
 
+    console.log(`\n=== prompt cosa non va (${esercizio.id}) ===`)
+    console.log(promptCosaNonVa(materia, esercizio, codice, risultati))
+
+    console.log(`\n=== prompt tutor esercizio (${esercizio.id}) ===`)
+    console.log(promptTutorEsercizio(materia, esercizio, codice, risultati))
+
     for (const livello of [1, 2, 3] as const) {
-      const indizio = promptIndizio(materia, esercizio, codice, livello)
+      const indizio = promptIndizio(materia, esercizio, codice, risultati, livello)
       console.log(`\n=== indizio livello ${livello} (${esercizio.id}) ===`)
       console.log(indizio)
     }

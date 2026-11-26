@@ -42,6 +42,90 @@
   font-size: 14px;
 }
 
+/* Il testo dell'IA arriva in markdown: qui blocchi e codice hanno un aspetto vero. */
+.testo-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.testo-ai p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.testo-ai pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: pre;
+}
+
+.testo-ai code {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.testo-ai pre code {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+/* Casi di test visibili prima di provare: si sa cosa ci si aspetta. */
+.test-esempi {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.test-esempi summary {
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.test-esempi ul {
+  margin-top: 8px;
+  padding-left: 18px;
+}
+
+/* Quello che il codice stampa con console.log, preso dal worker. */
+.console {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* Un pulsante che sembra un link: non merita una riga tutta sua. */
+.sezione button.link-bottone {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .esito-ok {
   color: #15803d;
 }

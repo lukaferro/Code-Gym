@@ -1,4 +1,4 @@
-import type { Esercizio } from './esercizi';
+import type { Esercizio } from './esercizi.ts';
 
 export type RisultatoTest = {
     input: unknown[];
@@ -12,6 +12,14 @@ export type RisultatoTest = {
 export type RichiestaTest = {
     codice: string;
     esercizio: Esercizio;
+}
+
+// Cosa il worker restituisce: i risultati e quello che il codice ha stampato.
+// `troncato` dice che le righe sono state tagliate per non bloccare la pagina.
+export type RispostaTest = {
+    risultati: RisultatoTest[];
+    log: string[];
+    troncato: boolean;
 }
 
 // Risultati finti usati quando il worker viene terminato per tempo scaduto.

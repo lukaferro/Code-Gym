@@ -1,17 +1,25 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
 import type { Esercizio } from './esercizi'
 import { materie } from './materie'
 import { risultatiTempoScaduto } from './runner'
-import type { RisultatoTest } from './runner'
+import type { RispostaTest, RisultatoTest } from './runner'
 import { useTemaScuro } from './tema'
 import Editor from '@monaco-editor/react'
 import { inviaTentativo, scaricaTentativi } from './tentativi'
 import type { Tentativo } from './tipi'
-import { promptIndizio, promptLezione, promptTestLivello } from './tutor'
+import {
+  promptCosaNonVa,
+  promptIndizio,
+  promptLezione,
+  promptTestLivello,
+  promptTutorBase,
+  promptTutorEsercizio,
+} from './tutor'
 import type { LivelloIndizio, Messaggio } from './tutor'
 import { linkMdn } from './docs'
+import { TestoAi } from './TestoAi'
 
 const LIMITE_MS = 3000
 
@@ -19,6 +27,16 @@ const LIMITE_MS = 3000
 // vieta dentro il componente: qui è lecito, misura il tempo di un click.
 function adesso(): number {
   return performance.now()
+}
+
+// Come mostriamo un valore sul serio: undefined e null devono leggersi, non sparire.
+function mostra(valore: unknown): string {
+  try {
+    const json = JSON.stringify(valore)
+    return json === undefined ? String(valore) : json
+  } catch {
+    return String(valore)
+  }
 }
 
 // Letta una volta sola, al caricamento del file: dentro il componente sarebbe
@@ -42,12 +60,7 @@ const materiaIniziale = materie.some((materia) => materia.id === materiaSalvata)
 function App() {
   const scuro = useTemaScuro()
 
-  // stato del tutor IA
-  const [domanda, setDomanda] = useState('')
-  const [risposta, setRisposta] = useState('')
   const [password, setPassword] = useState(passwordSalvata)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
   function cambiaPassword(nuova: string): void {
     setPassword(nuova)
@@ -63,33 +76,65 @@ function App() {
   const esercizio: Esercizio | undefined = eserciziMateria[indice]
   const [codice, setCodice] = useState(esercizio?.codiceIniziale ?? '')
   const [risultati, setRisultati] = useState<RisultatoTest[]>([])
+  const [righeLog, setRigheLog] = useState<string[]>([])
+  const [logTroncato, setLogTroncato] = useState(false)
   const [inCorso, setInCorso] = useState(false)
   const [salvataggio, setSalvataggio] = useState('')
+
+  // Il tempo parte dal primo tasto premuto e si azzera a ogni esecuzione:
+  // così la somma delle durate è il tempo vero passato sull'esercizio.
+  const ultimaAzione = useRef(0)
+  // Chiave dell'ultimo invio: una Prova con lo stesso codice non aggiunge nulla.
+  const ultimoInvio = useRef('')
 
   // stato del test di livello
   const [conversazione, setConversazione] = useState<Messaggio[]>([])
   const [bozza, setBozza] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatErrore, setChatErrore] = useState('')
-  const materiaCorrente =
-    materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
+  const materiaCorrente = materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
 
   // stato del backup
   const [backupMessaggio, setBackupMessaggio] = useState('')
   const [backupInCorso, setBackupInCorso] = useState(false)
 
-  // stato degli indizi: un contatore, perché ogni livello è autosufficiente
+  // aiuti sull'esercizio: un solo riquadro, mostra l'ultima risposta arrivata
   const [livelloIndizi, setLivelloIndizi] = useState(0)
-  const [indizio, setIndizio] = useState('')
-  const [indizioLoading, setIndizioLoading] = useState(false)
-  const [indizioErrore, setIndizioErrore] = useState('')
+  const [aiuto, setAiuto] = useState<{ titolo: string; testo: string } | null>(null)
+  const [aiutoLoading, setAiutoLoading] = useState(false)
+  const [aiutoErrore, setAiutoErrore] = useState('')
 
-  // stato della lezione: il blocco resta a schermo ma si può chiudere
+  // lezione: blocco a parte, resta a schermo ma si può chiudere
   const [lezione, setLezione] = useState('')
   const [lezioneAperta, setLezioneAperta] = useState(true)
   const [lezioneLoading, setLezioneLoading] = useState(false)
   const [lezioneErrore, setLezioneErrore] = useState('')
   const [lezioni, setLezioni] = useState(0)
+
+  // chat contestuale
+  const [tutorDomanda, setTutorDomanda] = useState('')
+  const [tutorRisposta, setTutorRisposta] = useState('')
+  const [tutorLoading, setTutorLoading] = useState(false)
+  const [tutorErrore, setTutorErrore] = useState('')
+
+  // ultimo prompt mandato: serve al pulsante "Copia prompt"
+  const [ultimoPrompt, setUltimoPrompt] = useState('')
+  const [copiato, setCopiato] = useState(false)
+
+  function azzeraAiuti(): void {
+    setLivelloIndizi(0)
+    setAiuto(null)
+    setAiutoErrore('')
+    setLezione('')
+    setLezioneErrore('')
+    setLezioni(0)
+    setTutorRisposta('')
+    setTutorErrore('')
+    setUltimoPrompt('')
+    setCopiato(false)
+    ultimaAzione.current = 0
+    ultimoInvio.current = ''
+  }
 
   function cambiaMateria(nuovaMateria: string): void {
     setMateriaScelta(nuovaMateria)
@@ -99,17 +144,13 @@ function App() {
     const primo = esercizi.find((singolo) => singolo.materia === nuovaMateria)
     setCodice(primo?.codiceIniziale ?? '')
     setRisultati([])
+    setRigheLog([])
+    setLogTroncato(false)
     setSalvataggio('')
     // Una conversazione su Git non vale per JavaScript.
     setConversazione([])
     setChatErrore('')
-    // L'indizio di un'altra materia non ha senso qui.
-    setLivelloIndizi(0)
-    setIndizio('')
-    setIndizioErrore('')
-    setLezione('')
-    setLezioneErrore('')
-    setLezioni(0)
+    azzeraAiuti()
   }
 
   function cambiaEsercizio(nuovoIndice: number): void {
@@ -117,14 +158,46 @@ function App() {
     // l'editor non si svuota da solo: rimettiamo il codice iniziale del nuovo esercizio
     setCodice(eserciziMateria[nuovoIndice].codiceIniziale)
     setRisultati([])
+    setRigheLog([])
+    setLogTroncato(false)
     setSalvataggio('')
-    // Il contatore è per esercizio: qui riparte da zero.
-    setLivelloIndizi(0)
-    setIndizio('')
-    setIndizioErrore('')
-    setLezione('')
-    setLezioneErrore('')
-    setLezioni(0)
+    azzeraAiuti()
+  }
+
+  // Un solo punto per parlare con l'IA: cambia il prompt, non il resto.
+  async function chiamaAi(sistema: string, utente: string): Promise<string> {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-app-password': password,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: sistema },
+          { role: 'user', content: utente },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      const dettaglio: { error?: string } = await res.json()
+      throw new Error(dettaglio.error ?? `Errore ${res.status}`)
+    }
+    const data: { text?: string } = await res.json()
+    if (!data.text) throw new Error('Risposta vuota')
+    // Tenuto per "Copia prompt": è il testo esatto che ha ricevuto l'IA.
+    setUltimoPrompt(`${sistema}\n\n---\n\n${utente}`)
+    setCopiato(false)
+    return data.text
+  }
+
+  async function copiaPrompt(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(ultimoPrompt)
+      setCopiato(true)
+    } catch {
+      setCopiato(false)
+    }
   }
 
   // base esplicito: dopo "Inizia test" lo stato conversazione non è ancora aggiornato
@@ -178,40 +251,22 @@ function App() {
 
   // Un indizio per volta: se la chiamata fallisce il livello non sale.
   async function chiediIndizio(): Promise<void> {
-    if (!esercizio || livelloIndizi >= 3 || indizioLoading) return
+    if (!esercizio || livelloIndizi >= 3 || aiutoLoading) return
     const livello = (livelloIndizi + 1) as LivelloIndizio
-    setIndizioLoading(true)
-    setIndizioErrore('')
+    setAiutoLoading(true)
+    setAiutoErrore('')
 
     try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-app-password': password,
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: promptIndizio(materiaCorrente, esercizio, codice, livello),
-            },
-            { role: 'user', content: "Dammi l'indizio." },
-          ],
-        }),
-      })
-      if (!res.ok) {
-        const dettaglio: { error?: string } = await res.json()
-        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
-      }
-      const data: { text?: string } = await res.json()
-      if (!data.text) throw new Error('Risposta vuota')
-      setIndizio(data.text)
+      const testo = await chiamaAi(
+        promptIndizio(materiaCorrente, esercizio, codice, risultati, livello),
+        "Dammi l'indizio."
+      )
+      setAiuto({ titolo: `Indizio ${livello} di 3`, testo })
       setLivelloIndizi(livello)
     } catch (err) {
-      setIndizioErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+      setAiutoErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
     } finally {
-      setIndizioLoading(false)
+      setAiutoLoading(false)
     }
   }
 
@@ -222,32 +277,55 @@ function App() {
     setLezioneErrore('')
 
     try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-app-password': password,
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: promptLezione(materiaCorrente, esercizio) },
-            { role: 'user', content: 'Spiegami la teoria.' },
-          ],
-        }),
-      })
-      if (!res.ok) {
-        const dettaglio: { error?: string } = await res.json()
-        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
-      }
-      const data: { text?: string } = await res.json()
-      if (!data.text) throw new Error('Risposta vuota')
-      setLezione(data.text)
+      setLezione(
+        await chiamaAi(
+          promptLezione(materiaCorrente, esercizio, codice, risultati),
+          'Spiegami la teoria.'
+        )
+      )
       setLezioneAperta(true)
       setLezioni(lezioni + 1)
     } catch (err) {
       setLezioneErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
     } finally {
       setLezioneLoading(false)
+    }
+  }
+
+  // Guarda il codice vero e i risultati veri: è il "perché non funziona".
+  async function chiediCosaNonVa(): Promise<void> {
+    if (!esercizio || aiutoLoading) return
+    setAiutoLoading(true)
+    setAiutoErrore('')
+
+    try {
+      const testo = await chiamaAi(
+        promptCosaNonVa(materiaCorrente, esercizio, codice, risultati),
+        "Cosa non va nel mio codice?"
+      )
+      setAiuto({ titolo: 'Cosa non va', testo })
+    } catch (err) {
+      setAiutoErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setAiutoLoading(false)
+    }
+  }
+
+  async function chiediTutor(): Promise<void> {
+    const pulito = tutorDomanda.trim()
+    if (!pulito || tutorLoading) return
+    setTutorLoading(true)
+    setTutorErrore('')
+
+    try {
+      const sistema = esercizio
+        ? promptTutorEsercizio(materiaCorrente, esercizio, codice, risultati)
+        : promptTutorBase(materiaCorrente)
+      setTutorRisposta(await chiamaAi(sistema, pulito))
+    } catch (err) {
+      setTutorErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setTutorLoading(false)
     }
   }
 
@@ -299,54 +377,48 @@ function App() {
     }
   }
 
-  async function invia() {
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-app-password': password,
-        },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: domanda }],
-        }),
-      })
-      if (!res.ok) {
-        const dettaglio: { error?: string } = await res.json()
-        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
-      }
-      const data = await res.json()
-      setRisposta(data.text)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore sconosciuto')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   function esegui(deveSalvare: boolean): void {
     if (!esercizio) return
     const esercizioCorrente = esercizio
     setInCorso(true)
     setSalvataggio('')
+    setRigheLog([])
+    setLogTroncato(false)
 
+    // Tempo dall'ultima azione: 0 significa "non ha ancora toccato l'editor".
     const inizio = adesso()
+    const durataMs =
+      ultimaAzione.current === 0 ? 0 : Math.max(0, Math.round(inizio - ultimaAzione.current))
+    ultimaAzione.current = 0
 
-    function finisci(nuovi: RisultatoTest[]): void {
-      const durataMs = Math.round(adesso() - inizio)
-      setRisultati(nuovi)
+    // Una Prova con lo stesso codice dell'ultima non aggiunge informazione.
+    const chiave = `${esercizioCorrente.id}\n${codice}`
+    const ripetuta = !deveSalvare && ultimoInvio.current === chiave
+    ultimoInvio.current = chiave
+
+    function finisci(risposta: RispostaTest): void {
+      setRisultati(risposta.risultati)
+      setRigheLog(risposta.log)
+      setLogTroncato(risposta.troncato)
       chiudi()
       // La scelta viaggia come parametro: lo stato sarebbe ancora quello vecchio.
-      if (deveSalvare) void salvaTentativo(nuovi, durataMs, livelloIndizi, lezioni)
+      if (!ripetuta) {
+        void salvaTentativo(
+          esercizioCorrente,
+          risposta.risultati,
+          durataMs,
+          livelloIndizi,
+          lezioni,
+          deveSalvare ? 'consegna' : 'prova'
+        )
+      }
     }
 
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
     // Se il worker non risponde entro il limite, lo terminiamo noi.
     const timer = setTimeout(() => {
-      finisci(risultatiTempoScaduto(esercizioCorrente))
+      finisci({ risultati: risultatiTempoScaduto(esercizioCorrente), log: [], troncato: false })
     }, LIMITE_MS)
 
     // funzione unica per chiudere tutto senza dimenticare il timer
@@ -356,57 +428,70 @@ function App() {
       setInCorso(false)
     }
 
-    worker.onmessage = (evento: MessageEvent<RisultatoTest[]>) => {
+    worker.onmessage = (evento: MessageEvent<RispostaTest>) => {
       finisci(evento.data)
     }
 
     worker.onerror = (evento: ErrorEvent) => {
-      finisci([
-        {
-          input: [],
-          atteso: undefined,
-          ottenuto: undefined,
-          corretto: false,
-          errore: evento.message || 'Errore nel worker',
-        },
-      ])
+      finisci({
+        risultati: [
+          {
+            input: [],
+            atteso: undefined,
+            ottenuto: undefined,
+            corretto: false,
+            errore: evento.message || 'Errore nel worker',
+          },
+        ],
+        log: [],
+        troncato: false,
+      })
     }
 
     worker.postMessage({ codice, esercizio: esercizioCorrente })
   }
 
   async function salvaTentativo(
+    esercizioCorrente: Esercizio,
     risultati: RisultatoTest[],
     durataMs: number,
     indizi: number,
-    lezioni: number
+    lezioni: number,
+    tipo: 'prova' | 'consegna'
   ): Promise<void> {
-    if (!esercizio) return
     const superati = risultati.filter((r) => r.corretto).length
     const tentativo: Tentativo = {
-      esercizioId: esercizio.id,
-      materia: esercizio.materia,
+      esercizioId: esercizioCorrente.id,
+      materia: esercizioCorrente.materia,
+      tipo,
       esito: superati === risultati.length,
       superati,
       totale: risultati.length,
       durataMs,
       indizi,
       lezioni,
-      errori: risultati
-        .flatMap((r) => (r.errore ? [r.errore] : []))
-        .slice(0, 5),
+      errori: risultati.flatMap((r) => (r.errore ? [r.errore] : [])).slice(0, 5),
       data: new Date().toISOString(),
     }
 
     try {
       await inviaTentativo(tentativo, password)
-      setSalvataggio('ok')
+      if (tipo === 'consegna') setSalvataggio('ok')
     } catch (err) {
-      setSalvataggio(err instanceof Error ? err.message : 'Salvataggio fallito')
+      // Una prova è dato di sottofondo: non riempiamo la pagina di errori.
+      if (tipo === 'consegna') {
+        setSalvataggio(err instanceof Error ? err.message : 'Salvataggio fallito')
+      }
     }
   }
 
   const superati = risultati.filter((risultato) => risultato.corretto).length
+  const falliti = risultati.filter((risultato) => !risultato.corretto)
+  const primoErrore = risultati[0]?.errore
+  const erroreUnico =
+    risultati.length > 0 && primoErrore !== undefined && risultati.every((r) => r.errore === primoErrore)
+      ? primoErrore
+      : ''
   const nomeMateria =
     materie.find((materia) => materia.id === materiaScelta)?.nome ?? materiaScelta
 
@@ -451,12 +536,30 @@ function App() {
             </p>
             <p>{esercizio.testo}</p>
 
+            <details className="test-esempi">
+              <summary>Cosa verrà provato ({esercizio.test.length} casi)</summary>
+              <ul>
+                {esercizio.test.map((test, posizione) => (
+                  <li key={posizione}>
+                    <code>
+                      {esercizio.nomeFunzione}({test.input.map(mostra).join(', ')})
+                    </code>{' '}
+                    deve dare <code>{mostra(test.atteso)}</code>
+                  </li>
+                ))}
+              </ul>
+            </details>
+
             <Editor
               height="320px"
               defaultLanguage="javascript"
               theme={scuro ? 'vs-dark' : 'light'}
               value={codice}
-              onChange={(nuovo) => setCodice(nuovo ?? '')}
+              onChange={(nuovo) => {
+                // Il cronometro parte al primo tasto, non all'apertura della pagina.
+                if (ultimaAzione.current === 0) ultimaAzione.current = adesso()
+                setCodice(nuovo ?? '')
+              }}
             />
 
             <div className="bottoni">
@@ -468,7 +571,8 @@ function App() {
               </button>
             </div>
             <p className="nota">
-              Prova esegue i test senza salvare niente. Consegna salva il tentativo nelle statistiche.
+              Prova salva una prova (non conta nelle statistiche). Consegna la salva come consegna,
+              anche se i test non passano: è quella che racconta come stai andando.
             </p>
 
             <div className="bottoni">
@@ -477,19 +581,31 @@ function App() {
               </button>
               <button
                 onClick={() => void chiediIndizio()}
-                disabled={indizioLoading || livelloIndizi >= 3}
+                disabled={aiutoLoading || livelloIndizi >= 3}
               >
-                {indizioLoading
-                  ? 'Attendo l’indizio...'
+                {aiutoLoading
+                  ? 'Attendo...'
                   : livelloIndizi >= 3
                     ? 'Nessun altro indizio'
                     : 'Aiutami'}
               </button>
-              <span className="nota">
-                Indizi: {livelloIndizi} su 3 · Lezioni: {lezioni}
-              </span>
+              <button onClick={() => void chiediCosaNonVa()} disabled={aiutoLoading}>
+                Cosa non va?
+              </button>
             </div>
-            {(lezione || indizio) && (
+            <p className="nota">
+              Indizi: {livelloIndizi} su 3 · Lezioni: {lezioni}
+              {ultimoPrompt && (
+                <>
+                  {' · '}
+                  <button className="link-bottone" onClick={() => void copiaPrompt()}>
+                    {copiato ? 'Prompt copiato' : 'Copia prompt per Gemini Pro'}
+                  </button>
+                </>
+              )}
+            </p>
+
+            {(lezione || aiuto) && (
               <div className="aiuto">
                 {lezione && (
                   // open controllato: l'attributo nudo si riapre a ogni ridisegno
@@ -498,36 +614,59 @@ function App() {
                     onToggle={(evento) => setLezioneAperta(evento.currentTarget.open)}
                   >
                     <summary>Teoria</summary>
-                    <p>{lezione}</p>
+                    <TestoAi testo={lezione} />
                   </details>
                 )}
-                {indizio && <p className="indizio">{indizio}</p>}
+                {aiuto && (
+                  <div className="indizio">
+                    <strong>{aiuto.titolo}</strong>
+                    <TestoAi testo={aiuto.testo} />
+                  </div>
+                )}
               </div>
             )}
             <p className="errore">{lezioneErrore}</p>
-            <p className="errore">{indizioErrore}</p>
+            <p className="errore">{aiutoErrore}</p>
 
             {risultati.length > 0 && (
-              <div>
-                <p>
-                  {superati} su {risultati.length} superati
+              <div className="esiti">
+                <p className={superati === risultati.length ? 'esito-ok' : 'esito-no'}>
+                  {superati} su {risultati.length} test superati
                 </p>
-                <ul>
-                  {risultati.map((risultato, posizione) => (
-                    <li key={posizione} className={risultato.corretto ? 'esito-ok' : 'esito-no'}>
-                      {risultato.corretto ? 'OK' : 'NO'} - input:{' '}
-                      {JSON.stringify(risultato.input)} - atteso: {JSON.stringify(risultato.atteso)}{' '}
-                      - ottenuto: {JSON.stringify(risultato.ottenuto) ?? '—'}
-                      {risultato.errore && <span> - errore: {risultato.errore}</span>}
-                    </li>
-                  ))}
-                </ul>
+
+                {erroreUnico ? (
+                  <p className="esito-no">Errore: {erroreUnico}</p>
+                ) : (
+                  falliti.length > 0 && (
+                    <ul>
+                      {falliti.map((risultato, posizione) => (
+                        <li key={posizione} className="esito-no">
+                          <code>
+                            {esercizio.nomeFunzione}({risultato.input.map(mostra).join(', ')})
+                          </code>{' '}
+                          → ottenuto <code>{mostra(risultato.ottenuto)}</code>, atteso{' '}
+                          <code>{mostra(risultato.atteso)}</code>
+                          {risultato.errore && <span> · {risultato.errore}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                )}
+
+                {righeLog.length > 0 && (
+                  <div>
+                    <p className="nota">
+                      Console ({righeLog.length} righe{logTroncato ? ', troncata' : ''})
+                    </p>
+                    <pre className="console">{righeLog.join('\n')}</pre>
+                  </div>
+                )}
               </div>
             )}
             {salvataggio && (
               <p className={salvataggio === 'ok' ? 'esito-ok' : 'esito-no'}>
                 {salvataggio === 'ok'
-                  ? 'Tentativo Salvato'
+                  ? 'Consegna salvata'
                   : `Salvataggio non riuscito: ${salvataggio}`}
               </p>
             )}
@@ -537,6 +676,38 @@ function App() {
             Per {nomeMateria} non ci sono ancora esercizi: arriveranno quelli generati dall'IA.
           </p>
         )}
+      </section>
+
+      <section className="sezione">
+        <h2>
+          {esercizio ? `Chiedi al tutor: ${esercizio.titolo}` : `Chiedi al tutor: ${nomeMateria}`}
+        </h2>
+        <p className="nota">
+          {esercizio
+            ? "L'insegnante vede il tuo codice e i risultati dell'ultima Prova."
+            : 'Scegli una materia con esercizi per avere il contesto del codice.'}
+        </p>
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            void chiediTutor()
+          }}
+        >
+          <textarea
+            value={tutorDomanda}
+            onChange={(e) => setTutorDomanda(e.target.value)}
+            placeholder="Es. perché il mio ciclo parte da 1?"
+          ></textarea>
+          <button type="submit" disabled={tutorLoading || tutorDomanda.trim().length === 0}>
+            {tutorLoading ? 'Attendo la risposta...' : 'Invia'}
+          </button>
+        </form>
+        {tutorRisposta && (
+          <div className="aiuto">
+            <TestoAi testo={tutorRisposta} />
+          </div>
+        )}
+        <p className="errore">{tutorErrore}</p>
       </section>
 
       <section className="sezione">
@@ -559,13 +730,17 @@ function App() {
         ) : (
           <div className="chat">
             {conversazione.map((messaggio, posizione) => (
-              <p
+              <div
                 key={posizione}
                 className={messaggio.role === 'user' ? 'chat-utente' : 'chat-ia'}
               >
-                <strong>{messaggio.role === 'user' ? 'Tu' : 'Insegnante'}:</strong>{' '}
-                {messaggio.content}
-              </p>
+                <strong>{messaggio.role === 'user' ? 'Tu' : 'Insegnante'}:</strong>
+                {messaggio.role === 'user' ? (
+                  <p>{messaggio.content}</p>
+                ) : (
+                  <TestoAi testo={messaggio.content} />
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -614,20 +789,6 @@ function App() {
           </label>
         </div>
         <p className="nota">{backupMessaggio}</p>
-      </section>
-
-      <section className="sezione">
-        <h2>Domanda veloce al tutor</h2>
-        <p className="nota">
-          Una domanda singola, senza contesto: per farlo ragionare su un esercizio usa il test di
-          livello o, più avanti, il pulsante "Aiutami".
-        </p>
-        <textarea value={domanda} onChange={(e) => setDomanda(e.target.value)}></textarea>
-        <button onClick={invia} disabled={loading}>
-          Invia
-        </button>
-        <p>{risposta}</p>
-        <p className="errore">{error}</p>
       </section>
     </>
   )
