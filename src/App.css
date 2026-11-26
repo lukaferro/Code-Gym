@@ -148,6 +148,44 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Storico: la tabella scorre in orizzontale sul telefono invece di rompere la pagina. */
+.tabella-scorrevole {
+  overflow-x: auto;
+}
+
+.storico {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.storico th,
+.storico td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.storico th {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.tipo-consegna,
+.tipo-prova {
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.tipo-consegna {
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .chat {

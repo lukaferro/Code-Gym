@@ -3,7 +3,7 @@ export type Esercizio = {
   materia: string
   titolo: string
   categoria: string
-  difficolta: 'facile' | 'medio' | 'difficile'
+  difficolta: 'riscaldamento' | 'facile' | 'medio' | 'difficile'
   testo: string
   codiceIniziale: string
   nomeFunzione: string
@@ -11,6 +11,88 @@ export type Esercizio = {
 }
 
 export const esercizi: Esercizio[] = [
+  // Riscaldamento: servono a capire il meccanismo (scrivi, Prova, guarda i test)
+  // senza combattere con il problema. Un paio di minuti ciascuno.
+  {
+    id: 'somma-due-numeri',
+    materia: 'javascript',
+    titolo: 'Somma due numeri',
+    categoria: 'numeri',
+    difficolta: 'riscaldamento',
+    testo:
+      'Scrivi somma(a, b) che restituisce la somma dei due numeri. Esempio: somma(2, 3) restituisce 5.',
+    codiceIniziale: `function somma(a, b) {\n  // scrivi qui il tuo codice\n}`,
+    nomeFunzione: 'somma',
+    test: [
+      { input: [2, 3], atteso: 5 },
+      { input: [-1, 1], atteso: 0 },
+      { input: [10, 0], atteso: 10 },
+    ],
+  },
+  {
+    id: 'ripeti-testo',
+    materia: 'javascript',
+    titolo: 'Ripeti un testo',
+    categoria: 'stringhe',
+    difficolta: 'riscaldamento',
+    testo:
+      'Scrivi ripeti(testo, volte) che restituisce il testo ripetuto il numero di volte indicato. Esempio: ripeti("ab", 3) restituisce "ababab".',
+    codiceIniziale: `function ripeti(testo, volte) {\n  // scrivi qui il tuo codice\n}`,
+    nomeFunzione: 'ripeti',
+    test: [
+      { input: ['ab', 3], atteso: 'ababab' },
+      { input: ['x', 0], atteso: '' },
+      { input: ['ciao', 1], atteso: 'ciao' },
+    ],
+  },
+  {
+    id: 'maggiore-di-due',
+    materia: 'javascript',
+    titolo: 'Il maggiore tra due',
+    categoria: 'numeri',
+    difficolta: 'riscaldamento',
+    testo:
+      'Scrivi maggiore(a, b) che restituisce il numero più grande tra i due. Esempio: maggiore(2, 5) restituisce 5.',
+    codiceIniziale: `function maggiore(a, b) {\n  // scrivi qui il tuo codice\n}`,
+    nomeFunzione: 'maggiore',
+    test: [
+      { input: [2, 5], atteso: 5 },
+      { input: [-3, -8], atteso: -3 },
+      { input: [4, 4], atteso: 4 },
+    ],
+  },
+  {
+    id: 'primo-carattere',
+    materia: 'javascript',
+    titolo: 'Il primo carattere',
+    categoria: 'stringhe',
+    difficolta: 'riscaldamento',
+    testo:
+      'Scrivi primoCarattere(testo) che restituisce il primo carattere; se il testo è vuoto restituisce "". Esempio: primoCarattere("ciao") restituisce "c".',
+    codiceIniziale: `function primoCarattere(testo) {\n  // scrivi qui il tuo codice\n}`,
+    nomeFunzione: 'primoCarattere',
+    test: [
+      { input: ['ciao'], atteso: 'c' },
+      { input: [''], atteso: '' },
+      { input: ['a'], atteso: 'a' },
+    ],
+  },
+  {
+    id: 'somma-fino-a',
+    materia: 'javascript',
+    titolo: 'Somma da 1 a n',
+    categoria: 'numeri',
+    difficolta: 'riscaldamento',
+    testo:
+      'Scrivi sommaFinoA(n) che restituisce la somma dei numeri da 1 a n. Per n = 0 restituisce 0. Esempio: sommaFinoA(3) restituisce 6.',
+    codiceIniziale: `function sommaFinoA(n) {\n  // scrivi qui il tuo codice\n}`,
+    nomeFunzione: 'sommaFinoA',
+    test: [
+      { input: [3], atteso: 6 },
+      { input: [1], atteso: 1 },
+      { input: [0], atteso: 0 },
+    ],
+  },
   {
     id: 'inverti-stringa',
     materia: 'javascript',

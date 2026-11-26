@@ -20,6 +20,7 @@ import {
 import type { LivelloIndizio, Messaggio } from './tutor'
 import { linkMdn } from './docs'
 import { TestoAi } from './TestoAi'
+import { Storico } from './Storico'
 
 const LIMITE_MS = 3000
 
@@ -710,6 +711,8 @@ function App() {
         <p className="errore">{tutorErrore}</p>
       </section>
 
+      <Storico password={password} />
+
       <section className="sezione">
         <h2>Test di livello: {nomeMateria}</h2>
         <div className="bottoni">
@@ -767,7 +770,8 @@ function App() {
         <h2>Backup dei tentativi</h2>
         <p className="nota">
           Esporta scarica tutti i tentativi in un file JSON. Importa rimanda al server le righe del
-          file: quelle già presenti vengono aggiunte di nuovo.
+          file: quelle già presenti vengono aggiunte di nuovo, con la data del giorno
+          dell'importazione (il file non riporta indietro l'orologio).
         </p>
         <div className="bottoni">
           <button onClick={() => void esportaTentativi()} disabled={backupInCorso}>
