@@ -107,15 +107,19 @@ Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi 
 | Lettura e salvataggio delle materie | `src/materieStore.ts` (da creare) |
 | Schermata di gestione materie | `src/GestioneMaterie.tsx` (da creare) |
 | Salvataggio dei tentativi e backup | `src/tentativi.ts` (invio all'API) |
+| Test di livello salvato e profilo estratto | `src/profili.ts` |
 | Prompt e logica dell'insegnante | `src/tutor.ts` |
 | Link ai docs MDN per categoria | `src/docs.ts` |
 | API con fallback tra provider | `api/ai.ts` |
 | API dei tentativi (GET backup, POST salvataggio) | `api/tentativi.ts` |
-| Database Turso (client, tabella, migrazioni) | `lib/db.ts` |
+| API del test di livello (GET, PUT, DELETE per materia) | `api/profilo.ts` |
+| Database Turso (client, tabelle, migrazioni) | `lib/db.ts` |
 | Esecuzione remota di codice (più avanti) | `api/run.ts` |
-| Script di prova locali | `scripts/prova-handler.ts`, `prova-tentativi.ts`, `prova-prompt.ts`, `prova-esercizi.ts`, `crea-tabelle.ts` |
+| Script di prova locali | `scripts/prova-handler.ts`, `prova-tentativi.ts`, `prova-profili.ts`, `prova-prompt.ts`, `prova-esercizi.ts`, `crea-tabelle.ts` |
 
 API: `POST /api/ai`, header `x-app-password`, body `{ "messages": [{ "role": "user", "content": "..." }] }`, risposta `{ "provider": "...", "text": "..." }`.
+
+Tabella `profili` (una riga per materia, l'ultimo test sostituisce il precedente): `materia` (chiave), `conversazione` (JSON dei messaggi), `profilo` (testo dopo `PROFILO:`), `aggiornato` (data decisa dal server).
 
 Variabili d'ambiente (nomi, mai i valori): `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `APP_PASSWORD`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`. Stanno in `.env.local` e nelle impostazioni di Vercel.
 
@@ -142,15 +146,19 @@ Prossimi passi, in ordine:
 11. [x] Aiuti contestuali (esercizio + codice + risultati), "Cosa non va?", chat sull'esercizio, testo dell'IA renderizzato
 12. [x] 5 esercizi di riscaldamento e casi di test visibili prima di provare
 13. [x] Storico dei tentativi in pagina (`Storico.tsx`), con prove e consegne distinte
-14. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
-15. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
+14. [x] Chat del tutor con memoria (tutta la conversazione a schermo, ultimi 8 messaggi all'IA)
+15. [x] Test di livello salvato su Turso (`profili`, `api/profilo.ts`), ripreso all'apertura, con "Copia profilo"
+16. [x] Consegna che eredita la durata della Prova appena fatta, deduplica di Consegne ed errori, "Prossimo esercizio"
+17. [x] Console sempre visibile dopo una Prova, con pulsante di esempio `console.log`
+18. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
+19. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
 
 ## Fasi
 
 ### Fase 2: insegnante IA (cuore del progetto)
 
 - **2a. Materie gestibili dall'app.** Menu di scelta, poi `materieStore.ts`, poi la schermata per aggiungere, modificare ed eliminare, e il suggerimento degli argomenti da parte dell'IA.
-- **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`) e a ogni invio mando tutta la lista a `/api/ai`. Il profilo per ora resta nella chat: verrà salvato con il profilo della Fase 3.
+- **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`); a ogni risposta si salva nella tabella `profili` (una riga per materia) e si riprende all'apertura della pagina. Il profilo (testo dopo `PROFILO:`) si può copiare e sarà il pezzo che passeremo ai prompt della Fase 3.
 - **2c. Tutor sugli errori.** Pulsante "Aiutami" con tre livelli, e ogni livello è un **tipo di aiuto diverso**: (1) una domanda che fa ragionare, senza nominare funzioni; (2) il concetto o il metodo giusto, senza codice; (3) lo schema del codice con i pezzi da riempire come commenti. Il prompt vieta la soluzione completa a ogni livello e riceve esercizio, codice e risultati veri dell'ultima Prova. Accanto c'è **"Cosa non va?"**, che parte dal test fallito, e "Copia prompt per Gemini Pro", che copia contesto e domanda. Gli indizi usati finiscono nel tentativo (`indizi`).
 - **2c-bis. Lezione contestuale.** Pulsante "Teoria" sull'esercizio: una lezione di massimo 12 righe sull'argomento, con un esempio su un **problema diverso** (così non è la soluzione travestita), due errori comuni e due domande di verifica. Il testo riceve l'esercizio, il mio codice e i risultati dei test, ma non deve risolverlo. Il contatore `lezioni` finisce nel tentativo. Insieme c'è un link ai docs MDN generato dalla categoria, senza IA.
 - **2d. Esercizi generati e tipi vari.** "Genera un esercizio su questo argomento", con validazione: l'IA fornisce anche una soluzione di riferimento, il runner la esegue contro i test e l'esercizio si scarta se la fallisce. Tipi: scrivere una funzione, trovare il bug, prevedere l'output, spiegare un concetto, complessità, code review.
@@ -183,7 +191,7 @@ Pillole (massimo 1-2 al giorno), chat libera con le mie statistiche, comandi `/o
 
 ## Modello dati minimo
 
-`Materia` (id, nome, argomenti, eseguibile, nascosta), `Esercizio` (con `materia` e difficoltà `riscaldamento` | `facile` | `medio` | `difficile`), `Tentativo` (materia, esercizio, `tipo` prova/consegna, esito, tempo dall'ultimo tasto, `indizi`, `lezioni`, tag errore, data; ogni Prova e ogni Consegna crea una riga), `StatArgomento`, `ProfiloStudente` (uno per materia), `Obiettivo`, `PianoSettimana`.
+`Materia` (id, nome, argomenti, eseguibile, nascosta), `Esercizio` (con `materia` e difficoltà `riscaldamento` | `facile` | `medio` | `difficile`), `Tentativo` (materia, esercizio, `tipo` prova/consegna, esito, tempo dall'ultimo tasto, `indizi`, `lezioni`, tag errore, data; ogni Prova e ogni Consegna crea una riga), `ProfiloTest` (una riga per materia con conversazione del test e profilo estratto), `StatArgomento`, `ProfiloStudente` (uno per materia), `Obiettivo`, `PianoSettimana`.
 
 ## Attenzioni
 
@@ -197,3 +205,5 @@ Pillole (massimo 1-2 al giorno), chat libera con le mie statistiche, comandi `/o
 - Le statistiche della Fase 3 devono contare solo `tipo = 'consegna'`: le prove salvate sono percorso, non risultati, e gonfierebbero i numeri.
 - `localStorage` si perde se cancello i dati del browser: per questo c'è il backup Esporta/Importa e, più avanti, il database.
 - Il codice di C# e Java valutato dall'IA non è eseguito davvero: può sbagliare.
+- Gli endpoint dentro `api/` sono autosufficienti (tipi e `autorizza` copiati): Vercel non risolve i file condivisi fuori da `api/`. Se cambia un tipo in `src/tipi.ts`, va cambiato anche lì.
+- Il test di livello si salva a ogni risposta dell'insegnante: una risposta persa costa un'altra chiamata all'IA, non il test intero.
