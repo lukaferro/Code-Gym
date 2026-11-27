@@ -52,7 +52,8 @@ Una **materia** è ciò su cui mi alleno: un linguaggio (JavaScript, TypeScript,
 - Dall'app posso **aggiungere, modificare ed eliminare** le materie, senza toccare il codice.
 - Per una materia nuova, l'IA può **proporre gli argomenti**: scrivo il nome e lei suggerisce una lista che posso correggere.
 - L'elenco in `src/materie.ts` è solo il **punto di partenza**. Quelle gestite dall'app si salvano a parte.
-- Salvataggio: all'inizio in `localStorage` del browser, dietro un modulo `materieStore.ts`; con il database (Fase 3) si sposta lì.
+- Salvataggio: all'inizio in `localStorage` del browser, dietro un modulo `materieStore.ts`; con il database (Fase 3) si sposta lì. Se cambio browser riparto dall'elenco iniziale.
+- L'**id** di una materia non cambia mai: è la chiave che lega tentativi e profili. Cambiare il nome è sicuro, cambiare l'id no.
 - Test di livello, esercizi e profilo si organizzano per materia: ogni materia ha il suo profilo.
 - Una materia eliminata non cancella la sua cronologia: la nasconde.
 
@@ -104,8 +105,8 @@ Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi 
 | Rendering del testo dell'IA | `src/TestoAi.tsx` |
 | Storico dei tentativi in pagina | `src/Storico.tsx` |
 | Materie iniziali | `src/materie.ts` |
-| Lettura e salvataggio delle materie | `src/materieStore.ts` (da creare) |
-| Schermata di gestione materie | `src/GestioneMaterie.tsx` (da creare) |
+| Lettura e salvataggio delle materie | `src/materieStore.ts` (localStorage, con funzioni pure) |
+| Schermata di gestione materie | `src/GestioneMaterie.tsx` |
 | Salvataggio dei tentativi e backup | `src/tentativi.ts` (invio all'API) |
 | Test di livello salvato e profilo estratto | `src/profili.ts` |
 | Prompt e logica dell'insegnante | `src/tutor.ts` |
@@ -115,7 +116,7 @@ Quando c'è, la **uso tutti i giorni per una settimana**, 20 minuti di esercizi 
 | API del test di livello (GET, PUT, DELETE per materia) | `api/profilo.ts` |
 | Database Turso (client, tabelle, migrazioni) | `lib/db.ts` |
 | Esecuzione remota di codice (più avanti) | `api/run.ts` |
-| Script di prova locali | `scripts/prova-handler.ts`, `prova-tentativi.ts`, `prova-profili.ts`, `prova-prompt.ts`, `prova-esercizi.ts`, `crea-tabelle.ts` |
+| Script di prova locali | `scripts/prova-handler.ts`, `prova-tentativi.ts`, `prova-profili.ts`, `prova-materie.ts`, `prova-prompt.ts`, `prova-esercizi.ts`, `crea-tabelle.ts` |
 
 API: `POST /api/ai`, header `x-app-password`, body `{ "messages": [{ "role": "user", "content": "..." }] }`, risposta `{ "provider": "...", "text": "..." }`.
 
@@ -150,14 +151,14 @@ Prossimi passi, in ordine:
 15. [x] Test di livello salvato su Turso (`profili`, `api/profilo.ts`), ripreso all'apertura, con "Copia profilo"
 16. [x] Consegna che eredita la durata della Prova appena fatta, deduplica di Consegne ed errori, "Prossimo esercizio"
 17. [x] Console sempre visibile dopo una Prova, con pulsante di esempio `console.log`
-18. [ ] Materie gestibili dall'app: `materieStore.ts` e schermata di gestione, con suggerimento degli argomenti dell'IA
+18. [x] Materie gestibili dall'app (`materieStore.ts` + `GestioneMaterie.tsx`): aggiungere, rinominare, argomenti suggeriti dall'IA, nascondere senza perdere la cronologia
 19. [ ] **Versione 1 completa: usarla ogni giorno per una settimana**
 
 ## Fasi
 
 ### Fase 2: insegnante IA (cuore del progetto)
 
-- **2a. Materie gestibili dall'app.** Menu di scelta, poi `materieStore.ts`, poi la schermata per aggiungere, modificare ed eliminare, e il suggerimento degli argomenti da parte dell'IA.
+- **2a. Materie gestibili dall'app.** Menu di scelta, `materieStore.ts` e la schermata "Gestisci le materie": aggiungere, rinominare, cambiare argomenti, nascondere. Gli argomenti può suggerirli l'IA (`promptArgomenti`), con la lista che si controlla prima di salvare. Fatto.
 - **2b. Test di livello.** L'IA mi fa 8-10 domande sulla materia scelta, una alla volta, valuta le risposte e scrive il mio primo profilo. La conversazione si accumula in uno stato (`conversazione`); a ogni risposta si salva nella tabella `profili` (una riga per materia) e si riprende all'apertura della pagina. Il profilo (testo dopo `PROFILO:`) si può copiare e sarà il pezzo che passeremo ai prompt della Fase 3.
 - **2c. Tutor sugli errori.** Pulsante "Aiutami" con tre livelli, e ogni livello è un **tipo di aiuto diverso**: (1) una domanda che fa ragionare, senza nominare funzioni; (2) il concetto o il metodo giusto, senza codice; (3) lo schema del codice con i pezzi da riempire come commenti. Il prompt vieta la soluzione completa a ogni livello e riceve esercizio, codice e risultati veri dell'ultima Prova. Accanto c'è **"Cosa non va?"**, che parte dal test fallito, e "Copia prompt per Gemini Pro", che copia contesto e domanda. Gli indizi usati finiscono nel tentativo (`indizi`).
 - **2c-bis. Lezione contestuale.** Pulsante "Teoria" sull'esercizio: una lezione di massimo 12 righe sull'argomento, con un esempio su un **problema diverso** (così non è la soluzione travestita), due errori comuni e due domande di verifica. Il testo riceve l'esercizio, il mio codice e i risultati dei test, ma non deve risolverlo. Il contatore `lezioni` finisce nel tentativo. Insieme c'è un link ai docs MDN generato dalla categoria, senza IA.

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
 import type { Esercizio } from './esercizi'
-import { materie } from './materie'
+import type { Materia } from './materie'
+import { leggiMaterie, salvaMaterie } from './materieStore'
 import { risultatiTempoScaduto } from './runner'
 import type { RispostaTest, RisultatoTest } from './runner'
 import { useTemaScuro } from './tema'
@@ -10,6 +11,7 @@ import Editor from '@monaco-editor/react'
 import { inviaTentativo, scaricaTentativi } from './tentativi'
 import type { Tentativo } from './tipi'
 import {
+  promptArgomenti,
   promptCosaNonVa,
   promptIndizio,
   promptLezione,
@@ -21,6 +23,7 @@ import type { LivelloIndizio, Messaggio } from './tutor'
 import { linkMdn } from './docs'
 import { TestoAi } from './TestoAi'
 import { Storico } from './Storico'
+import { GestioneMaterie } from './GestioneMaterie'
 import { eliminaProfilo, estraiProfilo, inviaProfilo, scaricaProfilo } from './profili'
 
 const LIMITE_MS = 3000
@@ -46,18 +49,22 @@ function mostra(valore: unknown): string {
 const passwordSalvata =
   typeof localStorage === 'undefined' ? '' : (localStorage.getItem('code-gym-password') ?? '')
 
-// Le materie eliminate restano nei dati ma non nel menu.
-const materieVisibili = materie.filter((materia) => !materia.nascosta)
+// Materie salvate nel browser, lette una volta sola come la password.
+const materieIniziali = leggiMaterie()
+const materieVisibiliIniziali = materieIniziali.filter((materia) => !materia.nascosta)
+
+// Materie con esercizi: non si possono nascondere, sono l'unica cosa eseguibile.
+const materieConEsercizi = [...new Set(esercizi.map((esercizio) => esercizio.materia))]
 
 // Ultima materia usata, letta una volta sola come la password.
 const materiaSalvata =
   typeof localStorage === 'undefined'
     ? 'javascript'
     : (localStorage.getItem('code-gym-materia') ?? 'javascript')
-// Se quell'id non esiste più, si riparte da JavaScript.
-const materiaIniziale = materie.some((materia) => materia.id === materiaSalvata)
+// Se quell'id non esiste più, si riparte dalla prima materia del menu.
+const materiaIniziale = materieVisibiliIniziali.some((materia) => materia.id === materiaSalvata)
   ? materiaSalvata
-  : 'javascript'
+  : (materieVisibiliIniziali[0]?.id ?? 'javascript')
 
 function App() {
   const scuro = useTemaScuro()
@@ -71,6 +78,8 @@ function App() {
   }
 
   // stato dell'esercizio
+  const [elencoMaterie, setElencoMaterie] = useState<Materia[]>(materieIniziali)
+  const materieVisibili = elencoMaterie.filter((materia) => !materia.nascosta)
   const [materiaScelta, setMateriaScelta] = useState(materiaIniziale)
   const [indice, setIndice] = useState(0)
   const eserciziMateria = esercizi.filter((singolo) => singolo.materia === materiaScelta)
@@ -104,7 +113,10 @@ function App() {
   const [profiloCopiato, setProfiloCopiato] = useState(false)
   // Materia del test già caricato: evita di rileggere e sovrascrivere a ogni cambio password.
   const profiloCaricatoPer = useRef('')
-  const materiaCorrente = materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
+  const materiaCorrente =
+    elencoMaterie.find((materia) => materia.id === materiaScelta) ??
+    materieVisibili[0] ??
+    materieIniziali[0]
 
   // stato del backup
   const [backupMessaggio, setBackupMessaggio] = useState('')
@@ -171,6 +183,17 @@ function App() {
     azzeraAiuti()
   }
 
+  // Ogni modifica alle materie si salva subito e non deve lasciare la pagina
+  // su una materia appena nascosta.
+  function applicaMaterie(nuovo: Materia[]): void {
+    setElencoMaterie(nuovo)
+    salvaMaterie(nuovo)
+    const visibili = nuovo.filter((materia) => !materia.nascosta)
+    if (!visibili.some((materia) => materia.id === materiaScelta)) {
+      cambiaMateria(visibili[0]?.id ?? 'javascript')
+    }
+  }
+
   function cambiaEsercizio(nuovoIndice: number): void {
     setIndice(nuovoIndice)
     // l'editor non si svuota da solo: rimettiamo il codice iniziale del nuovo esercizio
@@ -183,7 +206,9 @@ function App() {
   }
 
   // Un solo punto per parlare con l'IA: cambia il prompt, non il resto.
-  async function inviaAi(messaggi: Messaggio[]): Promise<string> {
+  // registra = false per le chiamate di servizio (es. suggerire argomenti):
+  // non devono sostituire il prompt che poi copi per Gemini Pro.
+  async function inviaAi(messaggi: Messaggio[], registra = true): Promise<string> {
     const res = await fetch('/api/ai', {
       method: 'POST',
       headers: {
@@ -198,20 +223,30 @@ function App() {
     }
     const data: { text?: string } = await res.json()
     if (!data.text) throw new Error('Risposta vuota')
-    // Tenuto per "Copia prompt": è il testo esatto che ha ricevuto l'IA.
-    setUltimoPrompt(
-      messaggi.map((messaggio) => `[${messaggio.role}]\n${messaggio.content}`).join('\n\n---\n\n')
-    )
-    setCopiato(false)
+    if (registra) {
+      // Tenuto per "Copia prompt": è il testo esatto che ha ricevuto l'IA.
+      setUltimoPrompt(
+        messaggi.map((messaggio) => `[${messaggio.role}]\n${messaggio.content}`).join('\n\n---\n\n')
+      )
+      setCopiato(false)
+    }
     return data.text
   }
 
   // Una domanda secca: indizi, lezione e "Cosa non va?" non hanno memoria.
-  async function chiamaAi(sistema: string, utente: string): Promise<string> {
-    return inviaAi([
-      { role: 'system', content: sistema },
-      { role: 'user', content: utente },
-    ])
+  async function chiamaAi(sistema: string, utente: string, registra = true): Promise<string> {
+    return inviaAi(
+      [
+        { role: 'system', content: sistema },
+        { role: 'user', content: utente },
+      ],
+      registra
+    )
+  }
+
+  // Argomenti proposti per la gestione materie: chiamata di servizio.
+  async function suggerisciArgomenti(nome: string): Promise<string> {
+    return chiamaAi(promptArgomenti(nome), 'Elenca gli argomenti.', false)
   }
 
   async function copiaPrompt(): Promise<void> {
@@ -618,7 +653,7 @@ function App() {
       ? primoErrore
       : ''
   const nomeMateria =
-    materie.find((materia) => materia.id === materiaScelta)?.nome ?? materiaScelta
+    elencoMaterie.find((materia) => materia.id === materiaScelta)?.nome ?? materiaScelta
   // Estratto a ogni disegno dalla conversazione: nessuno stato in più da tenere allineato.
   const profiloTest = estraiProfilo(conversazione)
 
@@ -955,6 +990,13 @@ function App() {
         </form>
         <p className="errore">{chatErrore}</p>
       </section>
+
+      <GestioneMaterie
+        elenco={elencoMaterie}
+        conEsercizi={materieConEsercizi}
+        onCambia={applicaMaterie}
+        onSuggerisci={suggerisciArgomenti}
+      />
 
       <section className="sezione">
         <h2>Backup dei tentativi</h2>

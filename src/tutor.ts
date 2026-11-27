@@ -8,6 +8,13 @@ export type Messaggio = {
   content: string
 }
 
+// Argomenti scritti a mano nella gestione materie: se mancano, li sceglie l'IA.
+function rigaArgomenti(materia: Materia): string {
+  return materia.argomenti.length > 0
+    ? `Argomenti su cui puoi interrogarlo: ${materia.argomenti.join(', ')}.`
+    : 'Non ha indicato argomenti: scegli tu quelli tipici della materia.'
+}
+
 // Prompt del test di livello: l'IA conduce lei la conversazione, una domanda
 // alla volta, e chiude con un profilo in poche righe.
 // Funzione pura: nessuno stato, nessuna rete. Si prova con scripts/prova-prompt.ts.
@@ -18,7 +25,7 @@ export function promptTestLivello(materia: Materia): string {
 
   return [
     `Sei un insegnante paziente di ${materia.nome} e stai facendo un test di livello a uno studente che si prepara ai colloqui tecnici.`,
-    `Argomenti su cui puoi interrogarlo: ${materia.argomenti.join(', ')}.`,
+    rigaArgomenti(materia),
     '',
     'Come conduci il test:',
     '- Fai una domanda alla volta e aspetta la risposta: non elencare più domande insieme.',
@@ -204,8 +211,20 @@ export function promptTutorEsercizio(
 export function promptTutorBase(materia: Materia): string {
   return [
     `Sei un insegnante paziente di ${materia.nome} per chi prepara colloqui tecnici.`,
-    `Argomenti: ${materia.argomenti.join(', ')}.`,
+    rigaArgomenti(materia),
     'Rispondi in italiano semplice, al massimo 8 righe, una cosa alla volta, con un esempio quando serve.',
     'Non dare mai soluzioni complete di esercizi: spiega il concetto e fai ragionare.',
+  ].join('\n')
+}
+
+// Argomenti proposti per una materia nuova o da completare: serve alla
+// schermata "Gestisci le materie", non all'esercizio. Funzione pura.
+export function promptArgomenti(nome: string): string {
+  return [
+    'Sei un insegnante che prepara uno studente ai colloqui tecnici.',
+    `Devi scegliere gli argomenti di una materia chiamata "${nome.trim().slice(0, 60)}".`,
+    'Rispondi con 6-8 argomenti, ognuno di massimo 4 parole, separati da virgola.',
+    'Devono essere argomenti su cui interrogare lo studente, dal più semplice al più difficile.',
+    "Niente introduzione, niente numeri, niente spiegazioni: solo l'elenco su una riga.",
   ].join('\n')
 }

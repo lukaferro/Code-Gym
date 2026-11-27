@@ -278,6 +278,45 @@
   display: none;
 }
 
+/* Gestione materie: ogni riga è una scheda, così si vede cosa si sta modificando. */
+.gestione-materie {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gestione-materie summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.elenco-materie {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.riga-materia {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.riga-materia-testa {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.riga-materia-testa input {
+  flex: 1;
+}
+
 .sezione form {
   display: flex;
   flex-direction: column;
