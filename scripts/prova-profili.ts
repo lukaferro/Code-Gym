@@ -81,7 +81,7 @@ await prova(
     headers: conPassword,
     body: {
       ...profilo,
-      conversazione: Array.from({ length: 31 }, () => ({ role: 'user', content: 'x' })),
+      conversazione: Array.from({ length: 61 }, () => ({ role: 'user', content: 'x' })),
     },
   },
   400

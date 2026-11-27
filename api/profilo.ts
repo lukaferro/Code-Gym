@@ -15,7 +15,7 @@ type ProfiloTest = {
     aggiornato: string;
 };
 
-const MAX_MESSAGGI = 30;
+const MAX_MESSAGGI = 60;
 const MAX_CARATTERI_MESSAGGIO = 4000;
 const MAX_CARATTERI_TOTALI = 40000;
 const MAX_PROFILO = 4000;
