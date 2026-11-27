@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { esercizi } from './esercizi'
 import type { Esercizio } from './esercizi'
@@ -21,6 +21,7 @@ import type { LivelloIndizio, Messaggio } from './tutor'
 import { linkMdn } from './docs'
 import { TestoAi } from './TestoAi'
 import { Storico } from './Storico'
+import { eliminaProfilo, estraiProfilo, inviaProfilo, scaricaProfilo } from './profili'
 
 const LIMITE_MS = 3000
 
@@ -85,14 +86,24 @@ function App() {
   // Il tempo parte dal primo tasto premuto e si azzera a ogni esecuzione:
   // così la somma delle durate è il tempo vero passato sull'esercizio.
   const ultimaAzione = useRef(0)
-  // Chiave dell'ultimo invio: una Prova con lo stesso codice non aggiunge nulla.
+  // Durata dell'ultima esecuzione: se la Consegna arriva subito dopo una Prova,
+  // il tempo del codice è quello, non zero.
+  const ultimaDurata = useRef(0)
+  // Chiavi degli ultimi invii: una Prova o una Consegna con lo stesso codice
+  // non aggiungono informazione.
   const ultimoInvio = useRef('')
+  const ultimaConsegna = useRef('')
 
   // stato del test di livello
   const [conversazione, setConversazione] = useState<Messaggio[]>([])
   const [bozza, setBozza] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatErrore, setChatErrore] = useState('')
+  // '' = nessun test, 'carico' = lettura, 'salvo'/'salvato' = scrittura, 'errore' = non salvato
+  const [statoTest, setStatoTest] = useState<'' | 'carico' | 'salvo' | 'salvato' | 'errore'>('')
+  const [profiloCopiato, setProfiloCopiato] = useState(false)
+  // Materia del test già caricato: evita di rileggere e sovrascrivere a ogni cambio password.
+  const profiloCaricatoPer = useRef('')
   const materiaCorrente = materie.find((materia) => materia.id === materiaScelta) ?? materie[0]
 
   // stato del backup
@@ -112,9 +123,10 @@ function App() {
   const [lezioneErrore, setLezioneErrore] = useState('')
   const [lezioni, setLezioni] = useState(0)
 
-  // chat contestuale
+  // chat contestuale: la conversazione intera resta a schermo, così l'insegnante
+  // ricorda cosa vi siete detti (all'IA ne mando solo gli ultimi messaggi).
   const [tutorDomanda, setTutorDomanda] = useState('')
-  const [tutorRisposta, setTutorRisposta] = useState('')
+  const [messaggiTutor, setMessaggiTutor] = useState<Messaggio[]>([])
   const [tutorLoading, setTutorLoading] = useState(false)
   const [tutorErrore, setTutorErrore] = useState('')
 
@@ -129,12 +141,14 @@ function App() {
     setLezione('')
     setLezioneErrore('')
     setLezioni(0)
-    setTutorRisposta('')
+    setMessaggiTutor([])
     setTutorErrore('')
     setUltimoPrompt('')
     setCopiato(false)
     ultimaAzione.current = 0
+    ultimaDurata.current = 0
     ultimoInvio.current = ''
+    ultimaConsegna.current = ''
   }
 
   function cambiaMateria(nuovaMateria: string): void {
@@ -148,9 +162,12 @@ function App() {
     setRigheLog([])
     setLogTroncato(false)
     setSalvataggio('')
-    // Una conversazione su Git non vale per JavaScript.
+    // Una conversazione su Git non vale per JavaScript: la sua la ricarica l'effetto.
     setConversazione([])
+    setBozza('')
     setChatErrore('')
+    setStatoTest('')
+    setProfiloCopiato(false)
     azzeraAiuti()
   }
 
@@ -166,19 +183,14 @@ function App() {
   }
 
   // Un solo punto per parlare con l'IA: cambia il prompt, non il resto.
-  async function chiamaAi(sistema: string, utente: string): Promise<string> {
+  async function inviaAi(messaggi: Messaggio[]): Promise<string> {
     const res = await fetch('/api/ai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-app-password': password,
       },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: sistema },
-          { role: 'user', content: utente },
-        ],
-      }),
+      body: JSON.stringify({ messages: messaggi }),
     })
     if (!res.ok) {
       const dettaglio: { error?: string } = await res.json()
@@ -187,9 +199,19 @@ function App() {
     const data: { text?: string } = await res.json()
     if (!data.text) throw new Error('Risposta vuota')
     // Tenuto per "Copia prompt": è il testo esatto che ha ricevuto l'IA.
-    setUltimoPrompt(`${sistema}\n\n---\n\n${utente}`)
+    setUltimoPrompt(
+      messaggi.map((messaggio) => `[${messaggio.role}]\n${messaggio.content}`).join('\n\n---\n\n')
+    )
     setCopiato(false)
     return data.text
+  }
+
+  // Una domanda secca: indizi, lezione e "Cosa non va?" non hanno memoria.
+  async function chiamaAi(sistema: string, utente: string): Promise<string> {
+    return inviaAi([
+      { role: 'system', content: sistema },
+      { role: 'user', content: utente },
+    ])
   }
 
   async function copiaPrompt(): Promise<void> {
@@ -209,6 +231,7 @@ function App() {
     const pulito = testo.trim()
     if (!pulito || chatLoading) return
 
+    const materiaTest = materiaCorrente.id
     const nuovi: Messaggio[] = [...base, { role: 'user', content: pulito }]
     setConversazione(nuovi)
     setBozza('')
@@ -216,27 +239,16 @@ function App() {
     setChatErrore('')
 
     try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-app-password': password,
-        },
-        body: JSON.stringify({
-          // il prompt delle regole viaggia come primo messaggio di sistema
-          messages: [
-            { role: 'system', content: promptTestLivello(materiaCorrente) },
-            ...nuovi,
-          ],
-        }),
-      })
-      if (!res.ok) {
-        const dettaglio: { error?: string } = await res.json()
-        throw new Error(dettaglio.error ?? `Errore ${res.status}`)
-      }
-      const data: { text?: string } = await res.json()
-      if (!data.text) throw new Error('Risposta vuota')
-      setConversazione([...nuovi, { role: 'assistant', content: data.text }])
+      const risposta = await inviaAi([
+        // il prompt delle regole viaggia come primo messaggio di sistema
+        { role: 'system', content: promptTestLivello(materiaCorrente) },
+        ...nuovi,
+      ])
+      const aggiornata: Messaggio[] = [...nuovi, { role: 'assistant', content: risposta }]
+      setConversazione(aggiornata)
+      setProfiloCopiato(false)
+      // Il test si salva a ogni risposta: chiudere la pagina non lo cancella.
+      void salvaTest(materiaTest, aggiornata)
     } catch (err) {
       // la conversazione resta com'era: si può riprovare senza perdere le risposte
       setChatErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
@@ -245,9 +257,81 @@ function App() {
     }
   }
 
+  async function salvaTest(materia: string, messaggi: Messaggio[]): Promise<void> {
+    setStatoTest('salvo')
+    try {
+      await inviaProfilo(
+        { materia, conversazione: messaggi, profilo: estraiProfilo(messaggi) },
+        password
+      )
+      setStatoTest('salvato')
+    } catch {
+      setStatoTest('errore')
+    }
+  }
+
+  // Riprende il test salvato quando cambi materia o ricarichi la pagina.
+  useEffect(() => {
+    if (!password) return
+    const materia = materiaScelta
+    // Già caricato (o appena azzerato): non sovrascrivere la conversazione viva.
+    if (profiloCaricatoPer.current === materia) return
+
+    let annullato = false
+    void (async () => {
+      setStatoTest('carico')
+      try {
+        const salvato = await scaricaProfilo(materia, password)
+        if (annullato) return
+        profiloCaricatoPer.current = materia
+        setConversazione(salvato?.conversazione ?? [])
+        setStatoTest(salvato ? 'salvato' : '')
+      } catch {
+        if (!annullato) {
+          profiloCaricatoPer.current = ''
+          setStatoTest('errore')
+        }
+      }
+    })()
+
+    return () => {
+      annullato = true
+    }
+  }, [materiaScelta, password])
+
   function iniziaTest(): void {
     setChatErrore('')
+    setProfiloCopiato(false)
     void inviaMessaggio('Iniziamo il test di livello.', [])
+  }
+
+  async function azzeraTest(): Promise<void> {
+    if (!window.confirm('Cancellare il test di livello salvato per questa materia?')) return
+    setChatErrore('')
+    setChatLoading(true)
+    try {
+      await eliminaProfilo(materiaCorrente.id, password)
+      setConversazione([])
+      setBozza('')
+      setProfiloCopiato(false)
+      setStatoTest('')
+      profiloCaricatoPer.current = materiaCorrente.id
+    } catch (err) {
+      setChatErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  async function copiaProfilo(): Promise<void> {
+    const profilo = estraiProfilo(conversazione)
+    if (!profilo) return
+    try {
+      await navigator.clipboard.writeText(profilo)
+      setProfiloCopiato(true)
+    } catch {
+      setProfiloCopiato(false)
+    }
   }
 
   // Un indizio per volta: se la chiamata fallisce il livello non sale.
@@ -315,6 +399,10 @@ function App() {
   async function chiediTutor(): Promise<void> {
     const pulito = tutorDomanda.trim()
     if (!pulito || tutorLoading) return
+
+    const nuovi: Messaggio[] = [...messaggiTutor, { role: 'user', content: pulito }]
+    setMessaggiTutor(nuovi)
+    setTutorDomanda('')
     setTutorLoading(true)
     setTutorErrore('')
 
@@ -322,8 +410,16 @@ function App() {
       const sistema = esercizio
         ? promptTutorEsercizio(materiaCorrente, esercizio, codice, risultati)
         : promptTutorBase(materiaCorrente)
-      setTutorRisposta(await chiamaAi(sistema, pulito))
+      const risposta = await inviaAi([
+        { role: 'system', content: sistema },
+        // Solo gli ultimi 8: abbastanza per ricordare, senza far crescere i token.
+        ...nuovi.slice(-8),
+      ])
+      setMessaggiTutor([...nuovi, { role: 'assistant', content: risposta }])
     } catch (err) {
+      // La domanda non è andata: la rimettiamo nella casella, pronta da reinviare.
+      setMessaggiTutor(messaggiTutor)
+      setTutorDomanda(pulito)
       setTutorErrore(err instanceof Error ? err.message : 'Errore sconosciuto')
     } finally {
       setTutorLoading(false)
@@ -378,6 +474,26 @@ function App() {
     }
   }
 
+  // Mette una riga di console.log dentro la funzione per vedere i valori veri dei
+  // test. Non la aggiunge due volte e non tocca il resto del codice.
+  function aggiungiEsempioConsole(): void {
+    const conArgomenti = "console.log('argomenti:', ...arguments) // poi togli questa riga"
+    const senzaArgomenti = "console.log('esempio attivo') // poi togli questa riga"
+    // `arguments` esiste solo nelle funzioni dichiarate con `function`.
+    const riga = /\bfunction\b/.test(codice) ? conArgomenti : senzaArgomenti
+    if (codice.includes(riga)) return
+
+    const graffa = codice.indexOf('{')
+    const nuovo =
+      graffa === -1
+        ? `${riga}\n${codice}`
+        : `${codice.slice(0, graffa + 1)}\n  ${riga}${codice.slice(graffa + 1)}`
+
+    setCodice(nuovo)
+    // Anche questa è un'azione sull'esercizio: il cronometro parte da qui.
+    if (ultimaAzione.current === 0) ultimaAzione.current = adesso()
+  }
+
   function esegui(deveSalvare: boolean): void {
     if (!esercizio) return
     const esercizioCorrente = esercizio
@@ -388,14 +504,20 @@ function App() {
 
     // Tempo dall'ultima azione: 0 significa "non ha ancora toccato l'editor".
     const inizio = adesso()
-    const durataMs =
+    let durataMs =
       ultimaAzione.current === 0 ? 0 : Math.max(0, Math.round(inizio - ultimaAzione.current))
+    // Consegna subito dopo una Prova, senza tasti nuovi: il tempo è quello del
+    // codice appena eseguito, non zero.
+    if (durataMs === 0 && deveSalvare) durataMs = ultimaDurata.current
     ultimaAzione.current = 0
+    ultimaDurata.current = durataMs
 
-    // Una Prova con lo stesso codice dell'ultima non aggiunge informazione.
+    // Una Prova o una Consegna con lo stesso codice non aggiungono informazione.
     const chiave = `${esercizioCorrente.id}\n${codice}`
     const ripetuta = !deveSalvare && ultimoInvio.current === chiave
+    const consegnaRipetuta = deveSalvare && ultimaConsegna.current === chiave
     ultimoInvio.current = chiave
+    if (deveSalvare) ultimaConsegna.current = chiave
 
     function finisci(risposta: RispostaTest): void {
       setRisultati(risposta.risultati)
@@ -403,7 +525,9 @@ function App() {
       setLogTroncato(risposta.troncato)
       chiudi()
       // La scelta viaggia come parametro: lo stato sarebbe ancora quello vecchio.
-      if (!ripetuta) {
+      if (consegnaRipetuta) {
+        setSalvataggio('ripetuta')
+      } else if (!ripetuta) {
         void salvaTentativo(
           esercizioCorrente,
           risposta.risultati,
@@ -471,7 +595,7 @@ function App() {
       durataMs,
       indizi,
       lezioni,
-      errori: risultati.flatMap((r) => (r.errore ? [r.errore] : [])).slice(0, 5),
+      errori: [...new Set(risultati.flatMap((r) => (r.errore ? [r.errore] : [])))].slice(0, 5),
       data: new Date().toISOString(),
     }
 
@@ -495,6 +619,8 @@ function App() {
       : ''
   const nomeMateria =
     materie.find((materia) => materia.id === materiaScelta)?.nome ?? materiaScelta
+  // Estratto a ogni disegno dalla conversazione: nessuno stato in più da tenere allineato.
+  const profiloTest = estraiProfilo(conversazione)
 
   return (
     <>
@@ -654,23 +780,45 @@ function App() {
                   )
                 )}
 
-                {righeLog.length > 0 && (
-                  <div>
-                    <p className="nota">
-                      Console ({righeLog.length} righe{logTroncato ? ', troncata' : ''})
-                    </p>
+                <div>
+                  <p className="nota">
+                    Console
+                    {righeLog.length > 0 &&
+                      ` (${righeLog.length} righe${logTroncato ? ', troncata' : ''})`}
+                  </p>
+                  {righeLog.length > 0 ? (
                     <pre className="console">{righeLog.join('\n')}</pre>
-                  </div>
-                )}
+                  ) : (
+                    <div className="console-vuota">
+                      <p className="nota">
+                        Qui compare quello che stampi con <code>console.log</code>.
+                      </p>
+                      <button className="link-bottone" onClick={aggiungiEsempioConsole}>
+                        Inserisci un console.log di esempio
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {salvataggio && (
               <p className={salvataggio === 'ok' ? 'esito-ok' : 'esito-no'}>
                 {salvataggio === 'ok'
                   ? 'Consegna salvata'
-                  : `Salvataggio non riuscito: ${salvataggio}`}
+                  : salvataggio === 'ripetuta'
+                    ? 'Consegna già salvata (codice identico)'
+                    : `Salvataggio non riuscito: ${salvataggio}`}
               </p>
             )}
+            {(salvataggio === 'ok' || salvataggio === 'ripetuta') &&
+              eserciziMateria.length > 1 && (
+                <button
+                  className="link-bottone"
+                  onClick={() => cambiaEsercizio((indice + 1) % eserciziMateria.length)}
+                >
+                  Prossimo esercizio
+                </button>
+              )}
           </>
         ) : (
           <p className="nota">
@@ -688,6 +836,23 @@ function App() {
             ? "L'insegnante vede il tuo codice e i risultati dell'ultima Prova."
             : 'Scegli una materia con esercizi per avere il contesto del codice.'}
         </p>
+        {messaggiTutor.length > 0 && (
+          <div className="chat">
+            {messaggiTutor.map((messaggio, posizione) => (
+              <div
+                key={posizione}
+                className={messaggio.role === 'user' ? 'chat-utente' : 'chat-ia'}
+              >
+                <strong>{messaggio.role === 'user' ? 'Tu' : 'Insegnante'}:</strong>
+                {messaggio.role === 'user' ? (
+                  <p>{messaggio.content}</p>
+                ) : (
+                  <TestoAi testo={messaggio.content} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <form
           onSubmit={(evento) => {
             evento.preventDefault()
@@ -703,9 +868,15 @@ function App() {
             {tutorLoading ? 'Attendo la risposta...' : 'Invia'}
           </button>
         </form>
-        {tutorRisposta && (
-          <div className="aiuto">
-            <TestoAi testo={tutorRisposta} />
+        {messaggiTutor.length > 0 && (
+          <div className="bottoni">
+            <button
+              className="link-bottone"
+              onClick={() => setMessaggiTutor([])}
+              disabled={tutorLoading}
+            >
+              Azzera chat
+            </button>
           </div>
         )}
         <p className="errore">{tutorErrore}</p>
@@ -716,15 +887,34 @@ function App() {
       <section className="sezione">
         <h2>Test di livello: {nomeMateria}</h2>
         <div className="bottoni">
-          <button onClick={iniziaTest} disabled={chatLoading}>
-            {chatLoading ? 'Attendo la risposta...' : 'Inizia test'}
-          </button>
+          {conversazione.length === 0 && (
+            <button onClick={iniziaTest} disabled={chatLoading}>
+              {chatLoading ? 'Attendo la risposta...' : 'Inizia test'}
+            </button>
+          )}
           {conversazione.length > 0 && (
-            <button onClick={() => setConversazione([])} disabled={chatLoading}>
-              Azzera
+            <button onClick={() => void azzeraTest()} disabled={chatLoading}>
+              Azzera test
+            </button>
+          )}
+          {profiloTest && (
+            <button className="link-bottone" onClick={() => void copiaProfilo()}>
+              {profiloCopiato ? 'Profilo copiato' : 'Copia profilo'}
             </button>
           )}
         </div>
+
+        {statoTest && (
+          <p className={statoTest === 'errore' ? 'errore' : 'nota'}>
+            {statoTest === 'carico'
+              ? 'Carico il test salvato...'
+              : statoTest === 'salvo'
+                ? 'Salvo il test...'
+                : statoTest === 'salvato'
+                  ? 'Test salvato su Turso.'
+                  : 'Test non salvato: controlla la password o la rete.'}
+          </p>
+        )}
 
         {conversazione.length === 0 ? (
           <p className="nota">

@@ -1,5 +1,5 @@
 import type { Client } from '@libsql/client';
-import type { Tentativo } from '../src/tipi.ts';
+import type { ProfiloTest, Tentativo } from '../src/tipi.ts';
 
 // Il tipo di client dipende dalla URL:
 // - libsql://... -> Turso via HTTP: funziona su Vercel, nessun binario nativo da caricare
@@ -56,6 +56,16 @@ export async function creaTabella(db: Client): Promise<void> {
 
     await db.execute('CREATE INDEX IF NOT EXISTS idx_tentativi_esercizio ON tentativi(esercizio_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_tentativi_data ON tentativi(data)');
+
+    // Test di livello: una riga per materia, riscritta a ogni risposta dell'insegnante.
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS profili (
+            materia TEXT PRIMARY KEY,
+            conversazione TEXT NOT NULL,
+            profilo TEXT NOT NULL DEFAULT '',
+            aggiornato TEXT NOT NULL
+        )
+    `);
 }
 
 export async function salvaTentativo(db: Client, tentativo: Tentativo): Promise<number> {
@@ -102,4 +112,47 @@ export async function leggiTentativi(db: Client, limite = 50): Promise<Tentativo
         errori: JSON.parse(String(riga.errori)) as string[],
         data: String(riga.data),
     }));
+}
+
+// Il test di livello si riscrive a ogni risposta: l'ultimo test vince.
+export async function salvaProfilo(db: Client, profilo: ProfiloTest): Promise<void> {
+    await db.execute({
+        sql: `INSERT INTO profili (materia, conversazione, profilo, aggiornato)
+              VALUES (?, ?, ?, ?)
+              ON CONFLICT(materia) DO UPDATE SET
+                conversazione = excluded.conversazione,
+                profilo = excluded.profilo,
+                aggiornato = excluded.aggiornato`,
+        args: [
+            profilo.materia,
+            JSON.stringify(profilo.conversazione),
+            profilo.profilo,
+            profilo.aggiornato,
+        ],
+    });
+}
+
+export async function leggiProfilo(db: Client, materia: string): Promise<ProfiloTest | null> {
+    const risultato = await db.execute({
+        sql: 'SELECT materia, conversazione, profilo, aggiornato FROM profili WHERE materia = ?',
+        args: [materia],
+    });
+
+    const riga = risultato.rows[0];
+    if (!riga) return null;
+
+    return {
+        materia: String(riga.materia),
+        conversazione: JSON.parse(String(riga.conversazione)) as ProfiloTest['conversazione'],
+        profilo: String(riga.profilo),
+        aggiornato: String(riga.aggiornato),
+    };
+}
+
+export async function eliminaProfilo(db: Client, materia: string): Promise<number> {
+    const risultato = await db.execute({
+        sql: 'DELETE FROM profili WHERE materia = ?',
+        args: [materia],
+    });
+    return Number(risultato.rowsAffected ?? 0);
 }

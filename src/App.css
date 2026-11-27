@@ -115,6 +115,16 @@
   overflow-y: auto;
 }
 
+/* Console vuota: spiega a cosa serve e offre l'esempio, invece di sparire. */
+.console-vuota {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
 /* Un pulsante che sembra un link: non merita una riga tutta sua. */
 .sezione button.link-bottone {
   border: none;
@@ -203,6 +213,16 @@
   background: var(--accent-bg);
   border-radius: 6px;
   padding: 8px 10px;
+}
+
+.chat-utente {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+}
+
+.chat-utente p {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 /* L'indizio è un blocco a parte: si legge mentre scrivi, senza confonderlo con i test. */
